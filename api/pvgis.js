@@ -90,12 +90,22 @@ export default async function handler(req, res) {
       });
     }
 
+    // PVGIS v5.2 no devuelve un campo "PR" directo en totals.fixed.
+    // Lo calculamos a partir de las pérdidas totales (l_total, en %),
+    // que sí vienen siempre informadas. PR = 1 - (pérdidas / 100).
+    // l_total puede venir como número negativo o positivo según la
+    // versión de la API, así que usamos su valor absoluto.
+    const perdidasPorcentaje = totales.l_total;
+    const performanceRatio = (typeof perdidasPorcentaje === 'number')
+      ? Math.max(0, Math.min(1, 1 - Math.abs(perdidasPorcentaje) / 100))
+      : null;
+
     return res.status(200).json({
       produccion_anual_kwh: totales.E_y,
       produccion_mensual_kwh: datos.outputs.monthly?.fixed || null,
       irradiacion_anual_kwh_m2: totales['H(i)_y'],
-      performance_ratio: totales.PR,
-      perdidas_porcentaje: totales.l_total,
+      performance_ratio: performanceRatio,
+      perdidas_porcentaje: perdidasPorcentaje,
       ubicacion: {
         lat: latNum,
         lon: lonNum,
