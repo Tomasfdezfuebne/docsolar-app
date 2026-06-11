@@ -1877,7 +1877,8 @@ function estimarIrradiacionPorLatitud(lat){
 function mostrarResultadoPVGIS(datos, esFallback){
   document.getElementById('pvgis-produccion').textContent = Math.round(datos.produccion).toLocaleString('es-ES');
   document.getElementById('pvgis-irradiacion').textContent = Math.round(datos.irradiacion).toLocaleString('es-ES');
-  document.getElementById('pvgis-pr').textContent = (datos.pr * 100).toFixed(0) + '%';
+  const prValido = typeof datos.pr === 'number' && !isNaN(datos.pr);
+  document.getElementById('pvgis-pr').textContent = prValido ? (datos.pr * 100).toFixed(0) + '%' : '–';
   document.getElementById('pvgis-res-badge').textContent = esFallback ? 'Estimación local' : 'Datos PVGIS reales';
   document.getElementById('pvgis-res-badge').style.background = esFallback ? 'var(--amarillo-fondo)' : 'var(--verde-suave)';
   document.getElementById('pvgis-res-badge').style.color = esFallback ? '#744210' : 'var(--verde-medio)';
