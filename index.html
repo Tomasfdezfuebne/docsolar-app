@@ -1418,8 +1418,9 @@
     <div class="output-panel" id="output">
       <div class="output-header">
         <div class="output-titulo" id="output-titulo">Memoria descriptiva generada</div>
-        <span class="output-badge">✓ Listo para revisar</span>
+        <span class="output-badge" id="output-badge">✓ Listo para revisar</span>
       </div>
+      <div class="pdf-status" id="ia-status" style="display:none"></div>
       <pre class="output-pre" id="output-contenido"></pre>
       <div class="output-acciones">
         <button class="btn btn-primario" onclick="descargarPDF()">
@@ -1933,13 +1934,9 @@ const loadingMsgs = [
 ];
 let loadInterval;
 
-function generarDocumentacion(){
-  const empresa = document.getElementById('empresa').value.trim();
-  const tecnico = document.getElementById('tecnico').value.trim();
-  const titular = document.getElementById('titular').value.trim();
-  const direccion = document.getElementById('direccion').value.trim();
-  const ccaa = document.getElementById('ccaa').value;
+let avisoFallbackIA = null;
 
+async function generarDocumentacion(){
   let errores = 0;
   [['empresa','err-empresa'],['tecnico','err-tecnico'],['titular','err-titular'],
    ['direccion','err-direccion'],['ccaa','err-ccaa']].forEach(([fid, eid])=>{
@@ -1954,29 +1951,78 @@ function generarDocumentacion(){
   document.getElementById('loading').classList.add('visible');
   document.querySelector('.btn-grande').disabled = true;
 
+  // Mensajes de carga rotando mientras esperamos la respuesta real de la IA
   let step = 0;
+  document.getElementById('loading-txt').textContent = loadingMsgs[0][0];
+  document.getElementById('loading-steps').textContent = loadingMsgs[0][1];
   loadInterval = setInterval(()=>{
-    if(step < loadingMsgs.length){
-      document.getElementById('loading-txt').textContent = loadingMsgs[step][0];
-      document.getElementById('loading-steps').textContent = loadingMsgs[step][1];
-      step++;
-    }
-  }, 700);
+    step = (step + 1) % loadingMsgs.length;
+    document.getElementById('loading-txt').textContent = loadingMsgs[step][0];
+    document.getElementById('loading-steps').textContent = loadingMsgs[step][1];
+  }, 1300);
 
-  setTimeout(()=>{
+  try {
+    await generarYMostrar();
+  } finally {
     clearInterval(loadInterval);
     document.getElementById('loading').classList.remove('visible');
     document.querySelector('.btn-grande').disabled = false;
-    mostrarOutput();
-  }, 3800);
+  }
 }
 
-function mostrarOutput(){
+/**
+ * Llama a NUESTRO backend (/api/generar-memoria), que a su vez llama a la
+ * API de Claude para redactar la memoria adaptada al proyecto. Si la IA no
+ * responde (o aún no hay ANTHROPIC_API_KEY en Vercel), cae automáticamente
+ * a la plantilla local para que la herramienta nunca se quede sin generar.
+ */
+async function generarYMostrar(){
   const datos = recopilarDatos();
   ultimosDatosGenerados = datos; // se reutiliza para el PDF, sin re-leer el formulario
-  const doc = generarMemoria(datos);
+
+  let texto = null;
+  let fuente = 'plantilla';
+  avisoFallbackIA = null;
+
+  try {
+    const resp = await fetch('/api/generar-memoria', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(datos)
+    });
+    const data = await resp.json();
+    if(!resp.ok || !data.memoria){
+      throw new Error(data.error || ('Error del servidor (' + resp.status + ')'));
+    }
+    texto = data.memoria;
+    fuente = 'ia';
+  } catch(err){
+    texto = generarMemoria(datos); // plantilla local de respaldo
+    fuente = 'plantilla';
+    avisoFallbackIA = err.message;
+  }
+
+  pintarOutput(datos, texto, fuente);
+}
+
+function pintarOutput(datos, texto, fuente){
   document.getElementById('output-titulo').textContent = 'Memoria descriptiva — ' + datos.titular;
-  document.getElementById('output-contenido').textContent = doc;
+  document.getElementById('output-contenido').textContent = texto;
+
+  const badge = document.getElementById('output-badge');
+  const aviso = document.getElementById('ia-status');
+  if(fuente === 'ia'){
+    badge.textContent = '✓ Redactada con IA';
+    aviso.style.display = 'none';
+  } else {
+    badge.textContent = 'Plantilla (sin IA)';
+    aviso.style.display = 'block';
+    aviso.className = 'pdf-status error';
+    aviso.textContent = '⚠ No se usó la IA, se generó con la plantilla local. Motivo: '
+      + (avisoFallbackIA || 'desconocido')
+      + '. Si aún no has configurado ANTHROPIC_API_KEY en Vercel, es lo esperado.';
+  }
+
   const panel = document.getElementById('output');
   panel.classList.add('visible');
   panel.scrollIntoView({behavior:'smooth', block:'start'});
