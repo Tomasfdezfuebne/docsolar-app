@@ -1804,39 +1804,38 @@ async function consultarPVGIS(){
     peakpower: kw,
     loss: perdidas,
     angle: incl,
-    aspect: azimut,
-    outputformat: 'json'
+    aspect: azimut
   });
 
-  const pvgisUrl = 'https://re.jrc.ec.europa.eu/api/v5_2/PVcalc?' + params.toString();
+  // Llamamos a NUESTRO backend (función serverless en /api/pvgis), que a su
+  // vez llama a PVGIS. Así evitamos el problema de CORS sin depender de
+  // proxies de terceros. Esta ruta es relativa: funciona tanto en local
+  // (vercel dev) como en producción (tu-proyecto.vercel.app).
+  const endpointPropio = '/api/pvgis?' + params.toString();
 
   try {
-    // Proxy CORS para poder llamar a PVGIS desde el navegador en esta demo.
-    // En producción: sustituir por tu propio endpoint backend, ej:
-    //   /api/pvgis?lat=...&lon=...&peakpower=...
-    const proxyUrl = 'https://corsproxy.io/?url=' + encodeURIComponent(pvgisUrl);
-    const resp = await fetch(proxyUrl);
-    if(!resp.ok) throw new Error('PVGIS no disponible en este momento (' + resp.status + ')');
+    const resp = await fetch(endpointPropio);
     const data = await resp.json();
 
-    const totals = data.outputs.totals.fixed;
-    const produccionAnual = totals.E_y; // kWh/año
-    const irradiacionAnual = totals['H(i)_y']; // kWh/m²/año sobre el plano inclinado
-    const pr = totals.PR; // performance ratio (0-1)
+    if(!resp.ok){
+      throw new Error(data.error || ('Error del servidor (' + resp.status + ')'));
+    }
 
     datosPVGIS = {
-      produccion: produccionAnual,
-      irradiacion: irradiacionAnual,
-      pr: pr,
+      produccion: data.produccion_anual_kwh,
+      irradiacion: data.irradiacion_anual_kwh_m2,
+      pr: data.performance_ratio,
       kwUsado: kw,
-      fuente: 'PVGIS (re.jrc.ec.europa.eu)'
+      fuente: data.fuente || 'PVGIS (re.jrc.ec.europa.eu)'
     };
 
     mostrarResultadoPVGIS(datosPVGIS);
     ocultarStatusPVGIS();
   } catch(err){
     // Fallback: cálculo local con fórmula equivalente a PVGIS,
-    // usando irradiación media de la zona por latitud aproximada
+    // usando irradiación media de la zona por latitud aproximada.
+    // Se activa si tu backend aún no está desplegado, o si PVGIS
+    // no responde puntualmente.
     const irradEstimada = estimarIrradiacionPorLatitud(coordsActuales.lat);
     const factorOri = {S:1.0, SE:0.97, SO:0.96, E:0.82, O:0.81, N:0.58};
     const fo = factorOri[orientacionSeleccionada] || 0.92;
@@ -1849,11 +1848,11 @@ async function consultarPVGIS(){
       irradiacion: Math.round(irradEstimada * fo * fi),
       pr: pr,
       kwUsado: kw,
-      fuente: 'Estimación local (PVGIS no accesible desde el navegador)'
+      fuente: 'Estimación local (no se pudo contactar con /api/pvgis)'
     };
 
     mostrarResultadoPVGIS(datosPVGIS, true);
-    mostrarStatusPVGIS('⚠ No se pudo conectar con PVGIS directamente (' + err.message + '). Se ha calculado una estimación local equivalente. En producción, esta llamada se hace desde el backend sin este problema.', 'error');
+    mostrarStatusPVGIS('⚠ No se pudo contactar con tu backend (' + err.message + '). Se ha calculado una estimación local equivalente. Si esto ocurre en Vercel, revisa que el archivo api/pvgis.js esté desplegado correctamente.', 'error');
   } finally {
     btn.disabled = false;
   }
