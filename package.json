@@ -1,0 +1,6 @@
+{
+  "name": "docsolar-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DocSolar - Generador de documentación técnica para instalaciones solares en España"
+}

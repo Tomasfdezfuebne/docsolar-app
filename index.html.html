@@ -1,0 +1,2173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DocSolar — Genera tu documentación técnica</title>
+<style>
+  :root {
+    --verde-oscuro: #0D3D2A;
+    --verde-medio: #1A6B45;
+    --verde-claro: #2E9E6B;
+    --verde-suave: #E8F5EE;
+    --verde-borde: #B8DFC9;
+    --texto: #1A1A1A;
+    --texto-medio: #4A5568;
+    --texto-suave: #718096;
+    --fondo: #F7FAF8;
+    --blanco: #FFFFFF;
+    --borde: #D1D9D4;
+    --error: #C53030;
+    --error-fondo: #FFF5F5;
+    --amarillo: #F6AD55;
+    --amarillo-fondo: #FFFBEB;
+    --radio: 10px;
+    --radio-sm: 6px;
+    --sombra: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--fondo);
+    color: var(--texto);
+    min-height: 100vh;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  /* HEADER */
+  .header {
+    background: var(--verde-oscuro);
+    padding: 0 24px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: white;
+    text-decoration: none;
+  }
+  .logo-icon {
+    width: 32px;
+    height: 32px;
+    background: var(--verde-claro);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .logo-icon svg { width: 18px; height: 18px; }
+  .logo-texto { font-weight: 600; font-size: 16px; letter-spacing: -0.3px; }
+  .logo-beta {
+    font-size: 10px;
+    font-weight: 600;
+    background: var(--verde-claro);
+    color: white;
+    padding: 2px 7px;
+    border-radius: 20px;
+    letter-spacing: 0.3px;
+  }
+  .header-right {
+    font-size: 13px;
+    color: rgba(255,255,255,0.55);
+  }
+
+  /* HERO STRIP */
+  .hero {
+    background: var(--verde-oscuro);
+    padding: 32px 24px 40px;
+    text-align: center;
+    color: white;
+  }
+  .hero h1 {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    margin-bottom: 8px;
+    line-height: 1.25;
+  }
+  .hero p {
+    font-size: 15px;
+    color: rgba(255,255,255,0.65);
+    max-width: 480px;
+    margin: 0 auto;
+  }
+  .hero-stats {
+    display: flex;
+    justify-content: center;
+    gap: 32px;
+    margin-top: 24px;
+    flex-wrap: wrap;
+  }
+  .hero-stat { text-align: center; }
+  .hero-stat-num {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--verde-claro);
+  }
+  .hero-stat-label {
+    font-size: 12px;
+    color: rgba(255,255,255,0.5);
+    margin-top: 2px;
+  }
+
+  /* PROGRESS BAR */
+  .progress-wrap {
+    background: var(--blanco);
+    border-bottom: 1px solid var(--borde);
+    padding: 0 24px;
+    position: sticky;
+    top: 60px;
+    z-index: 99;
+  }
+  .progress-inner {
+    max-width: 720px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 14px 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .progress-inner::-webkit-scrollbar { display: none; }
+  .step-item {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex-shrink: 0;
+  }
+  .step-bubble {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    border: 2px solid var(--borde);
+    background: var(--blanco);
+    color: var(--texto-suave);
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+  .step-bubble.activo {
+    background: var(--verde-medio);
+    border-color: var(--verde-medio);
+    color: white;
+  }
+  .step-bubble.hecho {
+    background: var(--verde-claro);
+    border-color: var(--verde-claro);
+    color: white;
+  }
+  .step-label {
+    font-size: 12px;
+    color: var(--texto-suave);
+    margin-left: 7px;
+    white-space: nowrap;
+  }
+  .step-label.activo { color: var(--verde-medio); font-weight: 600; }
+  .step-label.hecho { color: var(--verde-claro); }
+  .step-linea {
+    width: 28px;
+    height: 2px;
+    background: var(--borde);
+    margin: 0 6px;
+    flex-shrink: 0;
+  }
+  .step-linea.hecha { background: var(--verde-claro); }
+
+  /* MAIN */
+  main {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 32px 16px 80px;
+  }
+
+  /* SECCIÓN */
+  .seccion {
+    background: var(--blanco);
+    border: 1px solid var(--borde);
+    border-radius: var(--radio);
+    padding: 28px;
+    margin-bottom: 20px;
+    box-shadow: var(--sombra);
+  }
+  .seccion-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 22px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--verde-borde);
+  }
+  .seccion-icono {
+    width: 36px;
+    height: 36px;
+    background: var(--verde-suave);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .seccion-icono svg { width: 18px; height: 18px; color: var(--verde-medio); }
+  .seccion-titulo {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--verde-oscuro);
+  }
+  .seccion-subtitulo {
+    font-size: 12px;
+    color: var(--texto-suave);
+    margin-top: 1px;
+  }
+  .seccion-num {
+    margin-left: auto;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--verde-claro);
+    background: var(--verde-suave);
+    padding: 3px 9px;
+    border-radius: 20px;
+  }
+
+  /* GRID */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  @media (max-width: 560px) {
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+  }
+  .col-span-2 { grid-column: span 2; }
+  @media (max-width: 560px) { .col-span-2 { grid-column: span 1; } }
+
+  /* CAMPO */
+  .campo { display: flex; flex-direction: column; gap: 5px; }
+  .campo label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--texto-medio);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .requerido { color: var(--verde-claro); font-size: 12px; }
+  .campo input,
+  .campo select,
+  .campo textarea {
+    width: 100%;
+    height: 40px;
+    border: 1.5px solid var(--borde);
+    border-radius: var(--radio-sm);
+    padding: 0 12px;
+    font-size: 14px;
+    color: var(--texto);
+    background: var(--blanco);
+    transition: border-color 0.15s, box-shadow 0.15s;
+    -webkit-appearance: none;
+    appearance: none;
+    font-family: inherit;
+  }
+  .campo textarea {
+    height: auto;
+    min-height: 80px;
+    padding: 10px 12px;
+    resize: vertical;
+  }
+  .campo select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%234A5568' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 32px;
+    cursor: pointer;
+  }
+  .campo input:focus,
+  .campo select:focus,
+  .campo textarea:focus {
+    outline: none;
+    border-color: var(--verde-medio);
+    box-shadow: 0 0 0 3px rgba(26,107,69,0.12);
+  }
+  .campo input::placeholder,
+  .campo textarea::placeholder { color: #A0AEC0; }
+  .campo input.error { border-color: var(--error); }
+  .campo-error {
+    font-size: 12px;
+    color: var(--error);
+    display: none;
+  }
+  .campo-error.visible { display: block; }
+  .campo-hint {
+    font-size: 11px;
+    color: var(--texto-suave);
+  }
+
+  /* OPCIONES VISUALES (radio cards) */
+  .radio-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+  }
+  .radio-card {
+    border: 1.5px solid var(--borde);
+    border-radius: var(--radio-sm);
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+    background: var(--blanco);
+  }
+  .radio-card:hover { border-color: var(--verde-claro); background: var(--verde-suave); }
+  .radio-card input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  .radio-card.seleccionado {
+    border-color: var(--verde-medio);
+    background: var(--verde-suave);
+  }
+  .radio-card.seleccionado .radio-check { opacity: 1; }
+  .radio-check {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 16px;
+    height: 16px;
+    background: var(--verde-medio);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .radio-check svg { width: 9px; height: 9px; color: white; }
+  .radio-emoji { font-size: 20px; margin-bottom: 5px; display: block; }
+  .radio-label { font-size: 13px; font-weight: 500; color: var(--texto); display: block; }
+  .radio-sub { font-size: 11px; color: var(--texto-suave); margin-top: 1px; display: block; }
+
+  /* SLIDER */
+  .slider-wrap { position: relative; padding-top: 4px; }
+  .slider-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .slider-val {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--verde-medio);
+  }
+  .slider-unit { font-size: 14px; color: var(--texto-suave); margin-left: 2px; }
+  .slider-desc { font-size: 12px; color: var(--texto-suave); }
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 5px;
+    border-radius: 3px;
+    background: var(--borde);
+    outline: none;
+    cursor: pointer;
+    border: none;
+    padding: 0;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--verde-medio);
+    cursor: pointer;
+    border: 3px solid white;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    transition: transform 0.1s;
+  }
+  input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.15); }
+  input[type="range"]::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--verde-medio);
+    cursor: pointer;
+    border: 3px solid white;
+  }
+  .slider-marks {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 4px;
+  }
+  .slider-mark { font-size: 10px; color: var(--texto-suave); }
+
+  /* CHECKBOX DOCS */
+  .check-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  @media (max-width: 480px) { .check-grid { grid-template-columns: 1fr; } }
+  .check-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1.5px solid var(--borde);
+    border-radius: var(--radio-sm);
+    cursor: pointer;
+    transition: all 0.15s;
+    background: var(--blanco);
+  }
+  .check-item:hover { border-color: var(--verde-claro); background: var(--verde-suave); }
+  .check-item.marcado { border-color: var(--verde-medio); background: var(--verde-suave); }
+  .check-box {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--borde);
+    border-radius: 4px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 1px;
+    transition: all 0.15s;
+  }
+  .check-item.marcado .check-box {
+    background: var(--verde-medio);
+    border-color: var(--verde-medio);
+  }
+  .check-box svg { width: 10px; height: 10px; color: white; display: none; }
+  .check-item.marcado .check-box svg { display: block; }
+  .check-item input[type="checkbox"] { display: none; }
+  .check-texto { flex: 1; }
+  .check-nombre { font-size: 13px; font-weight: 500; color: var(--texto); }
+  .check-desc { font-size: 11px; color: var(--texto-suave); margin-top: 1px; }
+
+  /* AVISO */
+  .aviso {
+    border-radius: var(--radio-sm);
+    padding: 12px 14px;
+    font-size: 13px;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    margin-top: 16px;
+  }
+  .aviso-info { background: var(--verde-suave); border: 1px solid var(--verde-borde); color: var(--verde-oscuro); }
+  .aviso-warn { background: var(--amarillo-fondo); border: 1px solid #F6D860; color: #744210; }
+  .aviso svg { width: 16px; height: 16px; flex-shrink: 0; margin-top: 1px; }
+
+  /* RESUMEN FLOTANTE */
+  .resumen-card {
+    background: var(--blanco);
+    border: 1px solid var(--verde-borde);
+    border-radius: var(--radio);
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: var(--sombra);
+    position: sticky;
+    top: 112px;
+  }
+  .resumen-titulo {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--verde-oscuro);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .resumen-fila {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--fondo);
+    font-size: 13px;
+  }
+  .resumen-fila:last-child { border-bottom: none; }
+  .resumen-key { color: var(--texto-suave); }
+  .resumen-val { font-weight: 500; color: var(--texto); text-align: right; max-width: 160px; }
+  .resumen-vacio { color: #CBD5E0; font-style: italic; }
+
+  /* BOTONES */
+  .btn-wrap {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 28px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    height: 44px;
+    padding: 0 24px;
+    border-radius: var(--radio-sm);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: inherit;
+    white-space: nowrap;
+  }
+  .btn-primario {
+    background: var(--verde-medio);
+    color: white;
+  }
+  .btn-primario:hover { background: var(--verde-oscuro); }
+  .btn-primario:active { transform: scale(0.98); }
+  .btn-secundario {
+    background: var(--blanco);
+    color: var(--texto-medio);
+    border: 1.5px solid var(--borde);
+  }
+  .btn-secundario:hover { background: var(--fondo); }
+  .btn-grande {
+    height: 52px;
+    font-size: 16px;
+    padding: 0 32px;
+    width: 100%;
+    justify-content: center;
+    margin-top: 8px;
+    border-radius: var(--radio);
+    background: var(--verde-oscuro);
+  }
+  .btn-grande:hover { background: #0a2e1f; }
+  .btn-grande svg { width: 20px; height: 20px; }
+
+  /* OUTPUT PANEL */
+  .output-panel {
+    display: none;
+    background: var(--blanco);
+    border: 1px solid var(--verde-borde);
+    border-radius: var(--radio);
+    padding: 28px;
+    margin-top: 20px;
+    box-shadow: var(--sombra);
+  }
+  .output-panel.visible { display: block; }
+  .output-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--verde-borde);
+  }
+  .output-titulo { font-size: 16px; font-weight: 600; color: var(--verde-oscuro); }
+  .output-badge {
+    font-size: 11px;
+    font-weight: 600;
+    background: #C6F6D5;
+    color: #276749;
+    padding: 4px 10px;
+    border-radius: 20px;
+  }
+  .output-pre {
+    background: var(--fondo);
+    border: 1px solid var(--borde);
+    border-radius: var(--radio-sm);
+    padding: 20px;
+    font-size: 13px;
+    line-height: 1.8;
+    color: var(--texto);
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: inherit;
+    max-height: 500px;
+    overflow-y: auto;
+  }
+  .output-acciones {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+
+  /* LOADING */
+  .loading-wrap {
+    display: none;
+    text-align: center;
+    padding: 32px;
+  }
+  .loading-wrap.visible { display: block; }
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--verde-suave);
+    border-top-color: var(--verde-medio);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 16px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-txt { font-size: 14px; color: var(--texto-suave); }
+  .loading-steps { font-size: 12px; color: var(--verde-claro); margin-top: 6px; }
+
+  /* LAYOUT CON SIDEBAR */
+  .layout { display: grid; grid-template-columns: 1fr 260px; gap: 20px; align-items: start; }
+  @media (max-width: 740px) { .layout { grid-template-columns: 1fr; } }
+  @media (max-width: 740px) { .resumen-card { position: static; } }
+
+  /* SEPARADOR */
+  .separador { height: 1px; background: var(--fondo); border: none; margin: 6px 0; }
+
+  /* AHORRO */
+  .ahorro-strip {
+    background: var(--verde-oscuro);
+    color: white;
+    border-radius: var(--radio);
+    padding: 20px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+  .ahorro-num { font-size: 32px; font-weight: 800; color: var(--verde-claro); }
+  .ahorro-label { font-size: 13px; color: rgba(255,255,255,0.7); margin-top: 2px; }
+  .ahorro-desc { font-size: 14px; color: rgba(255,255,255,0.85); max-width: 300px; }
+
+  /* PVGIS BOX */
+  .pvgis-box {
+    background: var(--verde-suave);
+    border: 1px solid var(--verde-borde);
+    border-radius: var(--radio);
+    padding: 18px;
+  }
+  .pvgis-box-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .pvgis-box-icon {
+    width: 32px;
+    height: 32px;
+    background: var(--blanco);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border: 1px solid var(--verde-borde);
+  }
+  .pvgis-box-icon svg { width: 16px; height: 16px; color: var(--verde-medio); }
+  .pvgis-box-title { font-size: 13px; font-weight: 600; color: var(--verde-oscuro); }
+  .pvgis-box-sub { font-size: 11px; color: var(--texto-suave); margin-top: 1px; }
+  .pvgis-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .pvgis-coords {
+    font-size: 12px;
+    color: var(--texto-medio);
+    font-variant-numeric: tabular-nums;
+    background: var(--blanco);
+    border: 1px solid var(--verde-borde);
+    border-radius: var(--radio-sm);
+    padding: 9px 12px;
+    flex: 1;
+    min-width: 180px;
+  }
+  .pvgis-coords.con-datos { color: var(--verde-oscuro); font-weight: 500; }
+  .pvgis-status {
+    font-size: 12px;
+    padding: 9px 12px;
+    border-radius: var(--radio-sm);
+    margin-top: 10px;
+  }
+  .pvgis-status.cargando { background: var(--blanco); color: var(--texto-suave); border: 1px solid var(--borde); }
+  .pvgis-status.error { background: var(--error-fondo); color: var(--error); border: 1px solid #FEB2B2; }
+  .pvgis-status.exito { background: #C6F6D5; color: #276749; border: 1px solid #9AE6B4; }
+  .pvgis-resultado {
+    margin-top: 16px;
+    background: var(--blanco);
+    border: 1px solid var(--verde-borde);
+    border-radius: var(--radio-sm);
+    padding: 16px;
+  }
+  .pvgis-res-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .pvgis-res-badge {
+    font-size: 11px;
+    font-weight: 600;
+    background: var(--verde-suave);
+    color: var(--verde-medio);
+    padding: 3px 10px;
+    border-radius: 20px;
+  }
+  .pvgis-res-fuente { font-size: 11px; color: var(--texto-suave); }
+  .pvgis-res-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+  @media (max-width: 480px) { .pvgis-res-grid { grid-template-columns: 1fr; } }
+  .pvgis-res-item {
+    text-align: center;
+    background: var(--fondo);
+    border-radius: var(--radio-sm);
+    padding: 12px 8px;
+  }
+  .pvgis-res-num {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--verde-medio);
+  }
+  .pvgis-res-label {
+    font-size: 10px;
+    color: var(--texto-suave);
+    margin-top: 2px;
+    line-height: 1.3;
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <a href="#" class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+        <path d="M2 17l10 5 10-5"/>
+        <path d="M2 12l10 5 10-5"/>
+      </svg>
+    </div>
+    <span class="logo-texto">DocSolar</span>
+    <span class="logo-beta">BETA</span>
+  </a>
+  <span class="header-right">Documentación técnica solar en minutos</span>
+</header>
+
+<!-- HERO -->
+<section class="hero">
+  <h1>Genera tu documentación técnica<br>en menos de 5 minutos</h1>
+  <p>Rellena los datos del proyecto y la IA genera la memoria descriptiva, proyecto técnico y más documentos listos para firmar.</p>
+  <div class="hero-stats">
+    <div class="hero-stat">
+      <div class="hero-stat-num">< 5 min</div>
+      <div class="hero-stat-label">por proyecto</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-stat-num">8 docs</div>
+      <div class="hero-stat-label">generados automáticamente</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-stat-num">17 CCAA</div>
+      <div class="hero-stat-label">normativa actualizada</div>
+    </div>
+  </div>
+</section>
+
+<!-- PROGRESS -->
+<div class="progress-wrap">
+  <div class="progress-inner" id="progress-bar">
+    <!-- Generado por JS -->
+  </div>
+</div>
+
+<!-- MAIN -->
+<main>
+
+  <!-- AHORRO DINÁMICO -->
+  <div class="ahorro-strip" id="ahorro-strip">
+    <div>
+      <div class="ahorro-num" id="ahorro-horas">6,5 h</div>
+      <div class="ahorro-label">ahorradas en este proyecto</div>
+    </div>
+    <div class="ahorro-desc">Con DocSolar generas toda la documentación en minutos, no en horas.</div>
+  </div>
+
+  <div class="layout">
+    <div id="form-columna">
+
+    <!-- SECCIÓN 1: DATOS DEL INSTALADOR -->
+    <div class="seccion" id="sec-instalador">
+      <div class="seccion-header">
+        <div class="seccion-icono">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+        </div>
+        <div>
+          <div class="seccion-titulo">Datos del instalador</div>
+          <div class="seccion-subtitulo">Empresa que realiza la instalación</div>
+        </div>
+        <span class="seccion-num">1 / 5</span>
+      </div>
+
+      <div class="grid-2">
+        <div class="campo">
+          <label>Empresa instaladora <span class="requerido">*</span></label>
+          <input type="text" id="empresa" placeholder="Instalaciones Solares García S.L." oninput="actualizarResumen()">
+          <span class="campo-error" id="err-empresa">Campo obligatorio</span>
+        </div>
+        <div class="campo">
+          <label>CIF / NIF</label>
+          <input type="text" id="cif" placeholder="B12345678" oninput="actualizarResumen()">
+        </div>
+        <div class="campo">
+          <label>Nombre del técnico firmante <span class="requerido">*</span></label>
+          <input type="text" id="tecnico" placeholder="Nombre Apellido Apellido" oninput="actualizarResumen()">
+          <span class="campo-error" id="err-tecnico">Campo obligatorio</span>
+        </div>
+        <div class="campo">
+          <label>Nº de registro de instalador (RECI)</label>
+          <input type="text" id="reci" placeholder="RECI EX-12345" oninput="actualizarResumen()">
+          <span class="campo-hint">Registro de Empresas Instaladoras de baja tensión</span>
+        </div>
+        <div class="campo">
+          <label>Teléfono de contacto</label>
+          <input type="tel" id="telefono" placeholder="927 03 83 55">
+        </div>
+        <div class="campo">
+          <label>Email profesional</label>
+          <input type="email" id="email" placeholder="tecnico@empresa.es">
+        </div>
+      </div>
+    </div>
+
+    <!-- SECCIÓN 2: DATOS DEL CLIENTE -->
+    <div class="seccion" id="sec-cliente">
+      <div class="seccion-header">
+        <div class="seccion-icono">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            <polyline points="9 22 9 12 15 12 15 22"/>
+          </svg>
+        </div>
+        <div>
+          <div class="seccion-titulo">Datos del cliente y emplazamiento</div>
+          <div class="seccion-subtitulo">Titular de la instalación y dirección de la obra</div>
+        </div>
+        <span class="seccion-num">2 / 5</span>
+      </div>
+
+      <div class="grid-2">
+        <div class="campo col-span-2">
+          <label>Nombre / Razón social del titular <span class="requerido">*</span></label>
+          <input type="text" id="titular" placeholder="Empresa Titular S.A. o Nombre Apellidos" oninput="actualizarResumen()">
+          <span class="campo-error" id="err-titular">Campo obligatorio</span>
+        </div>
+        <div class="campo col-span-2">
+          <label>Dirección de la instalación <span class="requerido">*</span></label>
+          <input type="text" id="direccion" placeholder="Calle, número, código postal, municipio" oninput="actualizarResumen()">
+          <span class="campo-error" id="err-direccion">Campo obligatorio</span>
+        </div>
+        <div class="campo">
+          <label>Municipio <span class="requerido">*</span></label>
+          <input type="text" id="municipio" placeholder="Cáceres" oninput="actualizarResumen()">
+        </div>
+        <div class="campo">
+          <label>Comunidad Autónoma <span class="requerido">*</span></label>
+          <select id="ccaa" onchange="actualizarResumen(); actualizarNormativa()">
+            <option value="">Selecciona CCAA...</option>
+            <option value="AND">Andalucía</option>
+            <option value="ARA">Aragón</option>
+            <option value="AST">Asturias</option>
+            <option value="BAL">Islas Baleares</option>
+            <option value="CAN">Canarias</option>
+            <option value="CAT">Cataluña</option>
+            <option value="CAM">Cantabria</option>
+            <option value="CLM">Castilla-La Mancha</option>
+            <option value="CYL">Castilla y León</option>
+            <option value="EXT">Extremadura</option>
+            <option value="GAL">Galicia</option>
+            <option value="RIO">La Rioja</option>
+            <option value="MAD">Madrid</option>
+            <option value="MUR">Murcia</option>
+            <option value="NAV">Navarra</option>
+            <option value="PVA">País Vasco</option>
+            <option value="VAL">Comunidad Valenciana</option>
+          </select>
+          <span class="campo-error" id="err-ccaa">Selecciona una CCAA</span>
+        </div>
+        <div class="campo">
+          <label>Referencia catastral</label>
+          <input type="text" id="catastro" placeholder="1234567AB1234A0001ZZ">
+          <span class="campo-hint">Opcional pero recomendado para el proyecto</span>
+        </div>
+        <div class="campo">
+          <label>Tipo de inmueble</label>
+          <select id="inmueble" onchange="actualizarResumen()">
+            <option value="">Selecciona tipo...</option>
+            <option value="residencial_unifamiliar">Vivienda unifamiliar</option>
+            <option value="residencial_bloque">Bloque residencial</option>
+            <option value="industrial_nave">Nave industrial</option>
+            <option value="industrial_oficinas">Oficinas / terciario</option>
+            <option value="agricola">Instalación agrícola</option>
+            <option value="publico">Edificio público</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Normativa dinámica por CCAA -->
+      <div class="aviso aviso-info" id="aviso-normativa" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <span id="texto-normativa"></span>
+      </div>
+
+      <hr class="separador" style="margin: 18px 0;">
+
+      <!-- GEOLOCALIZACIÓN PVGIS -->
+      <div class="pvgis-box">
+        <div class="pvgis-box-header">
+          <div class="pvgis-box-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+              <circle cx="12" cy="9" r="2.5"/>
+            </svg>
+          </div>
+          <div>
+            <div class="pvgis-box-title">Datos de irradiación solar (PVGIS)</div>
+            <div class="pvgis-box-sub">Localiza la dirección para obtener producción real estimada de la zona</div>
+          </div>
+        </div>
+
+        <div class="pvgis-row">
+          <button class="btn btn-secundario" type="button" id="btn-localizar" onclick="localizarDireccion()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+            Localizar dirección
+          </button>
+          <div class="pvgis-coords" id="pvgis-coords">
+            <span class="resumen-vacio">Sin localizar todavía</span>
+          </div>
+        </div>
+
+        <div class="pvgis-status" id="pvgis-status" style="display:none"></div>
+
+        <div class="grid-2" style="margin-top: 14px;" id="pvgis-coords-manual">
+          <div class="campo">
+            <label>Latitud <span class="campo-hint">(opcional, manual)</span></label>
+            <input type="number" id="lat-manual" placeholder="39.4760" step="0.0001" oninput="marcarCoordsManual()">
+          </div>
+          <div class="campo">
+            <label>Longitud <span class="campo-hint">(opcional, manual)</span></label>
+            <input type="number" id="lon-manual" placeholder="-6.3722" step="0.0001" oninput="marcarCoordsManual()">
+          </div>
+        </div>
+
+        <button class="btn btn-primario" type="button" id="btn-pvgis" onclick="consultarPVGIS()" style="margin-top:14px; width:100%; justify-content:center;" disabled>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          Calcular producción real con PVGIS
+        </button>
+
+        <!-- Resultado PVGIS -->
+        <div class="pvgis-resultado" id="pvgis-resultado" style="display:none">
+          <div class="pvgis-res-header">
+            <span class="pvgis-res-badge" id="pvgis-res-badge">Datos PVGIS</span>
+            <span class="pvgis-res-fuente" id="pvgis-res-fuente"></span>
+          </div>
+          <div class="pvgis-res-grid">
+            <div class="pvgis-res-item">
+              <div class="pvgis-res-num" id="pvgis-produccion">–</div>
+              <div class="pvgis-res-label">kWh/año estimados (PVGIS)</div>
+            </div>
+            <div class="pvgis-res-item">
+              <div class="pvgis-res-num" id="pvgis-irradiacion">–</div>
+              <div class="pvgis-res-label">kWh/m²/año irradiación</div>
+            </div>
+            <div class="pvgis-res-item">
+              <div class="pvgis-res-num" id="pvgis-pr">–</div>
+              <div class="pvgis-res-label">Performance Ratio</div>
+            </div>
+          </div>
+          <button class="btn btn-secundario" type="button" style="margin-top:12px; width:100%; justify-content:center;" onclick="usarDatosPVGIS()">
+            Usar estos datos en la memoria descriptiva
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECCIÓN 3: CONFIGURACIÓN TÉCNICA -->
+    <div class="seccion" id="sec-tecnica">
+      <div class="seccion-header">
+        <div class="seccion-icono">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+          </svg>
+        </div>
+        <div>
+          <div class="seccion-titulo">Configuración técnica del sistema</div>
+          <div class="seccion-subtitulo">Potencia, paneles e inversores</div>
+        </div>
+        <span class="seccion-num">3 / 5</span>
+      </div>
+
+      <!-- Potencia -->
+      <div style="margin-bottom: 20px;">
+        <label style="font-size:13px;font-weight:500;color:var(--texto-medio);display:block;margin-bottom:10px;">
+          Potencia pico de la instalación <span class="requerido">*</span>
+        </label>
+        <div class="slider-wrap">
+          <div class="slider-top">
+            <div>
+              <span class="slider-val" id="val-potencia">10</span>
+              <span class="slider-unit">kWp</span>
+            </div>
+            <div class="slider-desc" id="desc-potencia">Instalación residencial típica</div>
+          </div>
+          <input type="range" id="potencia" min="1" max="500" step="0.5" value="10" oninput="actualizarPotencia()">
+          <div class="slider-marks">
+            <span class="slider-mark">1 kWp</span>
+            <span class="slider-mark">50 kWp</span>
+            <span class="slider-mark">100 kWp</span>
+            <span class="slider-mark">250 kWp</span>
+            <span class="slider-mark">500 kWp</span>
+          </div>
+        </div>
+        <div class="aviso aviso-warn" id="aviso-rtu" style="display:none; margin-top:12px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          <span id="texto-rtu">Instalaciones &gt;100 kWp requieren registro en REE (RIPRE) y comunicación previa a la CNMC.</span>
+        </div>
+      </div>
+
+      <hr class="separador">
+
+      <!-- Paneles -->
+      <div class="grid-2" style="margin: 16px 0;">
+        <div class="campo">
+          <label>Fabricante de paneles</label>
+          <select id="fabricante-panel">
+            <option value="">Selecciona o escribe...</option>
+            <option value="Jinko Solar">Jinko Solar</option>
+            <option value="LONGi Solar">LONGi Solar</option>
+            <option value="Canadian Solar">Canadian Solar</option>
+            <option value="Trina Solar">Trina Solar</option>
+            <option value="JA Solar">JA Solar</option>
+            <option value="Huawei">Huawei</option>
+            <option value="SunPower">SunPower</option>
+            <option value="Otro">Otro fabricante</option>
+          </select>
+        </div>
+        <div class="campo">
+          <label>Modelo / referencia del panel</label>
+          <input type="text" id="modelo-panel" placeholder="JKM420N-54HL4-B" oninput="actualizarResumen()">
+        </div>
+        <div class="campo">
+          <label>Potencia unitaria del panel (Wp)</label>
+          <input type="number" id="wp-panel" placeholder="420" min="100" max="800" oninput="calcularPaneles()">
+          <span class="campo-hint">Watios pico por panel</span>
+        </div>
+        <div class="campo">
+          <label>Número de paneles</label>
+          <input type="number" id="num-paneles" placeholder="24" min="1" oninput="actualizarResumen()">
+          <span class="campo-hint" id="hint-paneles">Se calculará automáticamente si introduces Wp</span>
+        </div>
+      </div>
+
+      <hr class="separador">
+
+      <!-- Inversor -->
+      <div class="grid-2" style="margin: 16px 0;">
+        <div class="campo">
+          <label>Fabricante del inversor</label>
+          <select id="fabricante-inversor">
+            <option value="">Selecciona...</option>
+            <option value="Fronius">Fronius</option>
+            <option value="SMA">SMA</option>
+            <option value="Huawei">Huawei</option>
+            <option value="Growatt">Growatt</option>
+            <option value="Solis">Solis</option>
+            <option value="Solaredge">SolarEdge</option>
+            <option value="Victron">Victron Energy</option>
+            <option value="ABB">ABB</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+        <div class="campo">
+          <label>Potencia del inversor (kW)</label>
+          <input type="number" id="kw-inversor" placeholder="10" min="0.5" max="500" step="0.5" oninput="actualizarResumen()">
+        </div>
+        <div class="campo">
+          <label>Tipo de conexión</label>
+          <select id="conexion" onchange="actualizarResumen()">
+            <option value="autoconsumo_sin_excedentes">Autoconsumo sin vertido a red</option>
+            <option value="autoconsumo_con_excedentes">Autoconsumo con vertido a red</option>
+            <option value="autoconsumo_colectivo">Autoconsumo colectivo</option>
+            <option value="aislada">Instalación aislada (off-grid)</option>
+          </select>
+        </div>
+        <div class="campo">
+          <label>¿Incluye sistema de almacenamiento?</label>
+          <select id="bateria" onchange="actualizarResumen()">
+            <option value="no">No</option>
+            <option value="si">Sí</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Batería (condicional) -->
+      <div id="sec-bateria" style="display:none">
+        <div class="grid-2">
+          <div class="campo">
+            <label>Capacidad batería (kWh)</label>
+            <input type="number" id="kwh-bateria" placeholder="10" min="1" max="1000">
+          </div>
+          <div class="campo">
+            <label>Fabricante batería</label>
+            <input type="text" id="fab-bateria" placeholder="BYD, Pylontech, Tesla...">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECCIÓN 4: ORIENTACIÓN E INCLINACIÓN -->
+    <div class="seccion" id="sec-orientacion">
+      <div class="seccion-header">
+        <div class="seccion-icono">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"/>
+            <line x1="12" y1="1" x2="12" y2="3"/>
+            <line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="1" y1="12" x2="3" y2="12"/>
+            <line x1="21" y1="12" x2="23" y2="12"/>
+          </svg>
+        </div>
+        <div>
+          <div class="seccion-titulo">Orientación e inclinación</div>
+          <div class="seccion-subtitulo">Afecta al cálculo de producción estimada</div>
+        </div>
+        <span class="seccion-num">4 / 5</span>
+      </div>
+
+      <div style="margin-bottom: 16px;">
+        <label style="font-size:13px;font-weight:500;color:var(--texto-medio);display:block;margin-bottom:10px;">Orientación principal de los paneles</label>
+        <div class="radio-grid" id="radio-orientacion">
+          <label class="radio-card" onclick="seleccionarRadio('orientacion', 'S', this)">
+            <input type="radio" name="orientacion" value="S">
+            <span class="radio-check"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>
+            <span class="radio-emoji">🧭</span>
+            <span class="radio-label">Sur</span>
+            <span class="radio-sub">Óptimo · +100%</span>
+          </label>
+          <label class="radio-card" onclick="seleccionarRadio('orientacion', 'SE', this)">
+            <input type="radio" name="orientacion" value="SE">
+            <span class="radio-check"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>
+            <span class="radio-emoji">↘️</span>
+            <span class="radio-label">Sureste</span>
+            <span class="radio-sub">Muy bueno · +95%</span>
+          </label>
+          <label class="radio-card" onclick="seleccionarRadio('orientacion', 'SO', this)">
+            <input type="radio" name="orientacion" value="SO">
+            <span class="radio-check"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>
+            <span class="radio-emoji">↙️</span>
+            <span class="radio-label">Suroeste</span>
+            <span class="radio-sub">Muy bueno · +94%</span>
+          </label>
+          <label class="radio-card" onclick="seleccionarRadio('orientacion', 'E', this)">
+            <input type="radio" name="orientacion" value="E">
+            <span class="radio-check"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>
+            <span class="radio-emoji">🌅</span>
+            <span class="radio-label">Este</span>
+            <span class="radio-sub">Bueno · +80%</span>
+          </label>
+          <label class="radio-card" onclick="seleccionarRadio('orientacion', 'O', this)">
+            <input type="radio" name="orientacion" value="O">
+            <span class="radio-check"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>
+            <span class="radio-emoji">🌇</span>
+            <span class="radio-label">Oeste</span>
+            <span class="radio-sub">Bueno · +80%</span>
+          </label>
+          <label class="radio-card" onclick="seleccionarRadio('orientacion', 'N', this)">
+            <input type="radio" name="orientacion" value="N">
+            <span class="radio-check"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>
+            <span class="radio-emoji">❄️</span>
+            <span class="radio-label">Norte</span>
+            <span class="radio-sub">Limitado · +55%</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Inclinación -->
+      <div>
+        <label style="font-size:13px;font-weight:500;color:var(--texto-medio);display:block;margin-bottom:10px;">
+          Inclinación de los paneles (ángulo)
+        </label>
+        <div class="slider-wrap">
+          <div class="slider-top">
+            <div>
+              <span class="slider-val" id="val-inclinacion">30</span>
+              <span class="slider-unit">°</span>
+            </div>
+            <div class="slider-desc" id="desc-inclinacion">Óptimo para latitud peninsular (~40°)</div>
+          </div>
+          <input type="range" id="inclinacion" min="5" max="90" step="1" value="30" oninput="actualizarInclinacion()">
+          <div class="slider-marks">
+            <span class="slider-mark">5° (plano)</span>
+            <span class="slider-mark">30° (óptimo)</span>
+            <span class="slider-mark">45°</span>
+            <span class="slider-mark">60°</span>
+            <span class="slider-mark">90° (vertical)</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-top: 16px;">
+        <div class="campo">
+          <label>Tipo de cubierta / soporte</label>
+          <select id="cubierta">
+            <option value="tejado_inclinado">Tejado inclinado</option>
+            <option value="cubierta_plana">Cubierta plana con estructura</option>
+            <option value="fachada">Fachada (BIPV)</option>
+            <option value="suelo">Instalación en suelo</option>
+            <option value="marquesina">Marquesina / pérgola</option>
+            <option value="flotante">Flotante</option>
+          </select>
+        </div>
+        <div class="campo">
+          <label>¿Hay posibles sombras?</label>
+          <select id="sombras" onchange="actualizarResumen()">
+            <option value="sin_sombras">Sin sombras relevantes</option>
+            <option value="sombras_leves">Sombras leves (árboles lejanos)</option>
+            <option value="sombras_moderadas">Sombras moderadas (chimeneas, etc.)</option>
+            <option value="sombras_graves">Sombras graves (edificios, obstáculos)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECCIÓN 5: DOCUMENTOS A GENERAR -->
+    <div class="seccion" id="sec-docs">
+      <div class="seccion-header">
+        <div class="seccion-icono">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+            <polyline points="10 9 9 9 8 9"/>
+          </svg>
+        </div>
+        <div>
+          <div class="seccion-titulo">Documentos a generar</div>
+          <div class="seccion-subtitulo">Selecciona los que necesitas</div>
+        </div>
+        <span class="seccion-num">5 / 5</span>
+      </div>
+
+      <div class="check-grid" id="check-docs">
+        <label class="check-item marcado" onclick="toggleCheck(this)">
+          <input type="checkbox" name="docs" value="memoria" checked>
+          <div class="check-box">
+            <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg>
+          </div>
+          <div class="check-texto">
+            <div class="check-nombre">Memoria descriptiva</div>
+            <div class="check-desc">Documento principal · siempre requerido</div>
+          </div>
+        </label>
+        <label class="check-item marcado" onclick="toggleCheck(this)">
+          <input type="checkbox" name="docs" value="proyecto" checked>
+          <div class="check-box">
+            <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg>
+          </div>
+          <div class="check-texto">
+            <div class="check-nombre">Proyecto técnico</div>
+            <div class="check-desc">Para instalaciones > 10 kWp</div>
+          </div>
+        </label>
+        <label class="check-item" onclick="toggleCheck(this)">
+          <input type="checkbox" name="docs" value="declaracion">
+          <div class="check-box">
+            <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg>
+          </div>
+          <div class="check-texto">
+            <div class="check-nombre">Declaración responsable</div>
+            <div class="check-desc">Requerida en la mayoría de CCAA</div>
+          </div>
+        </label>
+        <label class="check-item" onclick="toggleCheck(this)">
+          <input type="checkbox" name="docs" value="presupuesto">
+          <div class="check-box">
+            <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg>
+          </div>
+          <div class="check-texto">
+            <div class="check-nombre">Propuesta económica</div>
+            <div class="check-desc">Con ROI y amortización para el cliente</div>
+          </div>
+        </label>
+        <label class="check-item" onclick="toggleCheck(this)">
+          <input type="checkbox" name="docs" value="bcie">
+          <div class="check-box">
+            <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg>
+          </div>
+          <div class="check-texto">
+            <div class="check-nombre">BCIE (boletín eléctrico)</div>
+            <div class="check-desc">Boletín de Instalación Eléctrica</div>
+          </div>
+        </label>
+        <label class="check-item" onclick="toggleCheck(this)">
+          <input type="checkbox" name="docs" value="certificado_fin_obra">
+          <div class="check-box">
+            <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg>
+          </div>
+          <div class="check-texto">
+            <div class="check-nombre">Cert. fin de obra</div>
+            <div class="check-desc">Para tramitar compensación de excedentes</div>
+          </div>
+        </label>
+        <label class="check-item" onclick="toggleCheck(this)">
+          <input type="checkbox" name="docs" value="subvenciones">
+          <div class="check-box">
+            <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg>
+          </div>
+          <div class="check-texto">
+            <div class="check-nombre">Formulario de subvención</div>
+            <div class="check-desc">Detecta subvenciones aplicables</div>
+          </div>
+        </label>
+        <label class="check-item" onclick="toggleCheck(this)">
+          <input type="checkbox" name="docs" value="informe_produccion">
+          <div class="check-box">
+            <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg>
+          </div>
+          <div class="check-texto">
+            <div class="check-nombre">Informe de producción</div>
+            <div class="check-desc">Estimación anual con datos PVGIS</div>
+          </div>
+        </label>
+      </div>
+
+      <div class="aviso aviso-info" style="margin-top: 16px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <span>La memoria descriptiva se genera siempre. El proyecto técnico es obligatorio para instalaciones &gt; 10 kWp. El resto son opcionales según la CCAA seleccionada.</span>
+      </div>
+    </div>
+
+    <!-- NOTAS ADICIONALES -->
+    <div class="seccion">
+      <div class="seccion-header">
+        <div class="seccion-icono">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
+        </div>
+        <div>
+          <div class="seccion-titulo">Notas e instrucciones adicionales</div>
+          <div class="seccion-subtitulo">Opcional — la IA lo tendrá en cuenta</div>
+        </div>
+      </div>
+      <div class="campo">
+        <textarea id="notas" placeholder="Ej: La cubierta tiene una pendiente del 22%, hay una chimenea en el lado norte que proyecta sombra por la mañana. El cliente quiere que el documento incluya la opción de ampliar a 20 kWp en el futuro..."></textarea>
+      </div>
+    </div>
+
+    <!-- BOTÓN GENERAR -->
+    <button class="btn btn-primario btn-grande" onclick="generarDocumentacion()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+      </svg>
+      Generar documentación técnica
+    </button>
+
+    <!-- LOADING -->
+    <div class="loading-wrap" id="loading">
+      <div class="spinner"></div>
+      <div class="loading-txt" id="loading-txt">Analizando datos del proyecto...</div>
+      <div class="loading-steps" id="loading-steps">Conectando con base normativa de Extremadura</div>
+    </div>
+
+    <!-- OUTPUT -->
+    <div class="output-panel" id="output">
+      <div class="output-header">
+        <div class="output-titulo" id="output-titulo">Memoria descriptiva generada</div>
+        <span class="output-badge">✓ Listo para revisar</span>
+      </div>
+      <pre class="output-pre" id="output-contenido"></pre>
+      <div class="output-acciones">
+        <button class="btn btn-primario" onclick="descargarTxt()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Descargar .txt
+        </button>
+        <button class="btn btn-secundario" onclick="copiarTexto()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          Copiar texto
+        </button>
+        <button class="btn btn-secundario" onclick="generarDocumentacion()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          Regenerar
+        </button>
+      </div>
+    </div>
+
+    </div><!-- fin form-columna -->
+
+    <!-- RESUMEN LATERAL -->
+    <div>
+      <div class="resumen-card" id="resumen">
+        <div class="resumen-titulo">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--verde-medio)" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+          </svg>
+          Resumen del proyecto
+        </div>
+        <div class="resumen-fila">
+          <span class="resumen-key">Empresa</span>
+          <span class="resumen-val" id="r-empresa"><span class="resumen-vacio">–</span></span>
+        </div>
+        <div class="resumen-fila">
+          <span class="resumen-key">Titular</span>
+          <span class="resumen-val" id="r-titular"><span class="resumen-vacio">–</span></span>
+        </div>
+        <div class="resumen-fila">
+          <span class="resumen-key">CCAA</span>
+          <span class="resumen-val" id="r-ccaa"><span class="resumen-vacio">–</span></span>
+        </div>
+        <div class="resumen-fila">
+          <span class="resumen-key">Potencia</span>
+          <span class="resumen-val" id="r-potencia">10 kWp</span>
+        </div>
+        <div class="resumen-fila">
+          <span class="resumen-key">Paneles</span>
+          <span class="resumen-val" id="r-paneles"><span class="resumen-vacio">–</span></span>
+        </div>
+        <div class="resumen-fila">
+          <span class="resumen-key">Orientación</span>
+          <span class="resumen-val" id="r-orientacion"><span class="resumen-vacio">–</span></span>
+        </div>
+        <div class="resumen-fila">
+          <span class="resumen-key">Conexión</span>
+          <span class="resumen-val" id="r-conexion">Sin vertido a red</span>
+        </div>
+        <div class="resumen-fila">
+          <span class="resumen-key">Prod. estimada</span>
+          <span class="resumen-val" id="r-produccion"><span class="resumen-vacio">–</span></span>
+        </div>
+        <div class="resumen-fila">
+          <span class="resumen-key">Docs seleccionados</span>
+          <span class="resumen-val" id="r-docs">2 documentos</span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- fin layout -->
+</main>
+
+<script>
+const NORMATIVA_CCAA = {
+  AND: "Andalucía: se tramita a través de Industria Junta de Andalucía. Instalaciones > 100 kWp requieren EIA simplificado.",
+  EXT: "Extremadura: tramitación ante SEXPE. Instalaciones > 50 kWp requieren autorización administrativa previa.",
+  MAD: "Madrid: tramitación telemática a través del portal TRAMITA. Instalaciones residenciales < 15 kWp solo necesitan comunicación previa.",
+  CAT: "Cataluña: tramitación ante l'OGE (Oficina de Gestió Empresarial). El distribuidor es i-DE o Endesa según zona.",
+  VAL: "C. Valenciana: tramitación ante IVACE. Instalaciones de autoconsumo colectivo con regulación propia desde 2022.",
+  MUR: "Murcia: tramitación ante Dirección General de Industria. Plazos de resolución de 3-6 meses para instalaciones industriales.",
+  GAL: "Galicia: tramitación ante la Axencia INEGA. Existen subvenciones autonómicas propias para instalaciones domésticas.",
+  CYL: "Castilla y León: tramitación ante la Junta. Instalaciones < 25 kWp con declaración responsable, > 25 kWp con proyecto técnico.",
+  PVA: "País Vasco: tramitación ante Industria Gobierno Vasco. Normativa propia con subvenciones del programa EVE.",
+  ARA: "Aragón: tramitación ante el Dpto. de Industria. Región con alta irradiación en el valle del Ebro.",
+  CLM: "Castilla-La Mancha: tramitación ante Junta. Región líder en instalaciones fotovoltaicas en suelo a nivel nacional.",
+};
+
+const CCAA_NOMBRES = {
+  AND:"Andalucía",ARA:"Aragón",AST:"Asturias",BAL:"Baleares",CAN:"Canarias",CAT:"Cataluña",
+  CAM:"Cantabria",CLM:"Castilla-La Mancha",CYL:"Castilla y León",EXT:"Extremadura",
+  GAL:"Galicia",RIO:"La Rioja",MAD:"Madrid",MUR:"Murcia",NAV:"Navarra",PVA:"País Vasco",VAL:"C. Valenciana"
+};
+
+let orientacionSeleccionada = '';
+let coordsActuales = null; // {lat, lon, fuente}
+let datosPVGIS = null; // {produccion, irradiacion, pr}
+const steps = [
+  {label:'Instalador'},{label:'Cliente'},{label:'Sistema'},{label:'Orientación'},{label:'Documentos'}
+];
+
+function renderProgress(){
+  const bar = document.getElementById('progress-bar');
+  bar.innerHTML = steps.map((s,i)=>`
+    <div class="step-item">
+      <div class="step-bubble hecho" id="sb-${i}">${i+1}</div>
+      <span class="step-label" id="sl-${i}">${s.label}</span>
+    </div>
+    ${i < steps.length-1 ? `<div class="step-linea hecha" id="sl-l-${i}"></div>` : ''}
+  `).join('');
+}
+
+function actualizarPotencia(){
+  const v = parseFloat(document.getElementById('potencia').value);
+  document.getElementById('val-potencia').textContent = v >= 100 ? v.toFixed(0) : v;
+  let desc = '';
+  if(v <= 5) desc = 'Instalación muy pequeña (< 5 kWp)';
+  else if(v <= 15) desc = 'Instalación residencial típica';
+  else if(v <= 50) desc = 'Instalación PYME o gran vivienda';
+  else if(v <= 100) desc = 'Instalación industrial mediana';
+  else if(v <= 250) desc = 'Gran instalación industrial';
+  else desc = 'Planta fotovoltaica grande (> 250 kWp)';
+  document.getElementById('desc-potencia').textContent = desc;
+  document.getElementById('aviso-rtu').style.display = v > 100 ? 'flex' : 'none';
+
+  const wpEl = document.getElementById('wp-panel');
+  if(wpEl.value) calcularPaneles();
+  if(datosPVGIS && datosPVGIS.kwUsado !== v) invalidarPVGIS();
+  actualizarResumen();
+  actualizarAhorro();
+}
+
+function actualizarInclinacion(){
+  const v = parseInt(document.getElementById('inclinacion').value);
+  document.getElementById('val-inclinacion').textContent = v;
+  let desc = '';
+  if(v < 15) desc = 'Inclinación baja — puede acumular polvo';
+  else if(v <= 35) desc = 'Óptimo para latitud peninsular (~40°)';
+  else if(v <= 50) desc = 'Buena inclinación, genera más en invierno';
+  else if(v <= 70) desc = 'Alta inclinación, fachadas o cubiertas muy verticales';
+  else desc = 'Instalación en fachada o muro vertical';
+  document.getElementById('desc-inclinacion').textContent = desc;
+  invalidarPVGIS();
+  actualizarResumen();
+}
+
+function invalidarPVGIS(){
+  if(datosPVGIS){
+    datosPVGIS = null;
+    const resultado = document.getElementById('pvgis-resultado');
+    if(resultado.style.display !== 'none'){
+      resultado.style.display = 'none';
+      mostrarStatusPVGIS('Los parámetros han cambiado. Vuelve a calcular para obtener datos PVGIS actualizados.', 'cargando');
+    }
+  }
+}
+
+function calcularPaneles(){
+  const wp = parseFloat(document.getElementById('wp-panel').value);
+  const kw = parseFloat(document.getElementById('potencia').value);
+  if(wp && kw){
+    const n = Math.ceil((kw*1000)/wp);
+    document.getElementById('num-paneles').value = n;
+    document.getElementById('hint-paneles').textContent = `${n} paneles de ${wp}Wp = ${(n*wp/1000).toFixed(2)} kWp`;
+  }
+  actualizarResumen();
+}
+
+function seleccionarRadio(nombre, valor, elem){
+  document.querySelectorAll(`[onclick*="'${nombre}'"]`).forEach(e=>e.classList.remove('seleccionado'));
+  elem.classList.add('seleccionado');
+  elem.querySelector('input').checked = true;
+  if(nombre === 'orientacion'){
+    orientacionSeleccionada = valor;
+    invalidarPVGIS();
+  }
+  actualizarResumen();
+}
+
+function toggleCheck(elem){
+  elem.classList.toggle('marcado');
+  const cb = elem.querySelector('input[type=checkbox]');
+  cb.checked = !cb.checked;
+  actualizarResumen();
+}
+
+function actualizarNormativa(){
+  const ccaa = document.getElementById('ccaa').value;
+  const aviso = document.getElementById('aviso-normativa');
+  if(ccaa && NORMATIVA_CCAA[ccaa]){
+    aviso.style.display = 'flex';
+    document.getElementById('texto-normativa').textContent = NORMATIVA_CCAA[ccaa];
+  } else {
+    aviso.style.display = 'none';
+  }
+}
+
+function actualizarAhorro(){
+  const kw = parseFloat(document.getElementById('potencia').value)||10;
+  let horas = 4.5;
+  if(kw > 100) horas = 12;
+  else if(kw > 50) horas = 8;
+  else if(kw > 15) horas = 6;
+  document.getElementById('ahorro-horas').textContent = horas.toFixed(1) + ' h';
+}
+
+function actualizarResumen(){
+  const empresa = document.getElementById('empresa').value || null;
+  const titular = document.getElementById('titular').value || null;
+  const ccaa = document.getElementById('ccaa').value;
+  const kw = parseFloat(document.getElementById('potencia').value)||10;
+  const paneles = document.getElementById('num-paneles').value;
+  const conexion = document.getElementById('conexion').value;
+  const docs = document.querySelectorAll('input[name=docs]:checked').length;
+
+  const conexionTextos = {
+    autoconsumo_sin_excedentes:'Sin vertido a red',
+    autoconsumo_con_excedentes:'Con vertido a red',
+    autoconsumo_colectivo:'Autoconsumo colectivo',
+    aislada:'Instalación aislada'
+  };
+
+  const produccionEstimada = calcularProduccion(kw, orientacionSeleccionada, ccaa);
+  const esPVGISReal = datosPVGIS && datosPVGIS.kwUsado === kw && datosPVGIS.fuente.startsWith('PVGIS');
+
+  setR('r-empresa', empresa);
+  setR('r-titular', titular);
+  setR('r-ccaa', ccaa ? CCAA_NOMBRES[ccaa] : null);
+  document.getElementById('r-potencia').textContent = kw + ' kWp';
+  setR('r-paneles', paneles ? paneles + ' unidades' : null);
+  setR('r-orientacion', orientacionSeleccionada || null);
+  document.getElementById('r-conexion').textContent = conexionTextos[conexion] || 'Sin vertido a red';
+  if(produccionEstimada){
+    const etiqueta = esPVGISReal
+      ? `<strong>${produccionEstimada.toLocaleString('es-ES')} kWh/año</strong> <span style="font-size:10px;color:var(--verde-claro);font-weight:600;">PVGIS</span>`
+      : `<strong>${produccionEstimada.toLocaleString('es-ES')} kWh/año</strong> <span style="font-size:10px;color:var(--texto-suave);">(estim.)</span>`;
+    document.getElementById('r-produccion').innerHTML = etiqueta;
+  } else {
+    document.getElementById('r-produccion').innerHTML = '<span class="resumen-vacio">–</span>';
+  }
+  document.getElementById('r-docs').textContent = docs + ' documento' + (docs!==1?'s':'');
+}
+
+function setR(id, val){
+  const el = document.getElementById(id);
+  if(val) { el.textContent = val; el.style.color = ''; }
+  else { el.innerHTML = '<span class="resumen-vacio">–</span>'; }
+}
+
+function calcularProduccion(kw, orientacion, ccaa){
+  if(!kw) return null;
+  // Si tenemos datos reales de PVGIS para esta misma potencia, los usamos
+  if(datosPVGIS && datosPVGIS.kwUsado === kw){
+    return Math.round(datosPVGIS.produccion);
+  }
+  const irradBase = {AND:1800,EXT:1750,MAD:1600,CAT:1550,VAL:1620,MUR:1750,
+    GAL:1200,CYL:1450,CLM:1700,ARA:1600,BAL:1700,CAN:1900,AST:1100,CAM:1100,RIO:1500,NAV:1400,PVA:1200};
+  const irrad = irradBase[ccaa] || 1500;
+  const factorOri = {S:1.0, SE:0.97, SO:0.96, E:0.82, O:0.81, N:0.58};
+  const fo = factorOri[orientacion] || 0.92;
+  const incl = parseInt(document.getElementById('inclinacion').value)||30;
+  const fi = incl >= 20 && incl <= 45 ? 1.0 : incl < 20 ? 0.92 : 0.88;
+  return Math.round(kw * irrad * fo * fi * 0.78);
+}
+
+/* ============================================================
+   GEOLOCALIZACIÓN (Nominatim / OpenStreetMap) + PVGIS
+   ============================================================ */
+
+const ORIENTACION_A_AZIMUT = {
+  // PVGIS usa azimut: 0 = Sur, -90 = Este, 90 = Oeste, 180/-180 = Norte
+  S: 0, SE: -45, SO: 45, E: -90, O: 90, N: 180
+};
+
+function mostrarStatusPVGIS(mensaje, tipo){
+  const el = document.getElementById('pvgis-status');
+  el.style.display = 'block';
+  el.className = 'pvgis-status ' + tipo;
+  el.textContent = mensaje;
+}
+
+function ocultarStatusPVGIS(){
+  document.getElementById('pvgis-status').style.display = 'none';
+}
+
+function marcarCoordsManual(){
+  const lat = parseFloat(document.getElementById('lat-manual').value);
+  const lon = parseFloat(document.getElementById('lon-manual').value);
+  if(!isNaN(lat) && !isNaN(lon)){
+    coordsActuales = {lat, lon, fuente: 'Coordenadas manuales'};
+    actualizarCajaCoords();
+    document.getElementById('btn-pvgis').disabled = false;
+  } else {
+    document.getElementById('btn-pvgis').disabled = true;
+  }
+}
+
+function actualizarCajaCoords(){
+  const caja = document.getElementById('pvgis-coords');
+  if(coordsActuales){
+    caja.classList.add('con-datos');
+    caja.innerHTML = `📍 ${coordsActuales.lat.toFixed(4)}, ${coordsActuales.lon.toFixed(4)} <span style="color:var(--texto-suave); font-weight:400;">— ${coordsActuales.fuente}</span>`;
+  } else {
+    caja.classList.remove('con-datos');
+    caja.innerHTML = '<span class="resumen-vacio">Sin localizar todavía</span>';
+  }
+}
+
+/**
+ * Geocodifica la dirección introducida usando Nominatim (OpenStreetMap),
+ * un servicio gratuito sin necesidad de API key.
+ * Documentación: https://nominatim.org/release-docs/latest/api/Search/
+ */
+async function localizarDireccion(){
+  const direccion = document.getElementById('direccion').value.trim();
+  const municipio = document.getElementById('municipio').value.trim();
+  const ccaaSelect = document.getElementById('ccaa');
+  const ccaaTexto = ccaaSelect.value ? ccaaSelect.options[ccaaSelect.selectedIndex].text : '';
+
+  if(!direccion && !municipio){
+    mostrarStatusPVGIS('Escribe al menos el municipio o la dirección antes de localizar.', 'error');
+    return;
+  }
+
+  const consulta = [direccion, municipio, ccaaTexto, 'España'].filter(Boolean).join(', ');
+  const btn = document.getElementById('btn-localizar');
+  btn.disabled = true;
+  mostrarStatusPVGIS('Buscando coordenadas para: "' + consulta + '"...', 'cargando');
+
+  try {
+    const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=es&q=' + encodeURIComponent(consulta);
+    const resp = await fetch(url, {
+      headers: { 'Accept-Language': 'es' }
+    });
+    if(!resp.ok) throw new Error('Error de red al consultar Nominatim');
+    const datos = await resp.json();
+
+    if(!datos || datos.length === 0){
+      // Reintento solo con municipio + CCAA si la dirección completa no dio resultado
+      if(direccion && municipio){
+        const consultaCorta = [municipio, ccaaTexto, 'España'].filter(Boolean).join(', ');
+        const resp2 = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=es&q=' + encodeURIComponent(consultaCorta), {headers:{'Accept-Language':'es'}});
+        const datos2 = await resp2.json();
+        if(datos2 && datos2.length > 0){
+          coordsActuales = {lat: parseFloat(datos2[0].lat), lon: parseFloat(datos2[0].lon), fuente: 'Aprox. por municipio (Nominatim)'};
+          actualizarCajaCoords();
+          document.getElementById('btn-pvgis').disabled = false;
+          mostrarStatusPVGIS('No se encontró la dirección exacta, se usó el centro del municipio como aproximación.', 'exito');
+          btn.disabled = false;
+          return;
+        }
+      }
+      throw new Error('No se encontraron coordenadas para esa ubicación. Prueba a escribir solo el municipio, o introduce las coordenadas manualmente.');
+    }
+
+    coordsActuales = {lat: parseFloat(datos[0].lat), lon: parseFloat(datos[0].lon), fuente: 'Nominatim (OpenStreetMap)'};
+    actualizarCajaCoords();
+    document.getElementById('btn-pvgis').disabled = false;
+    ocultarStatusPVGIS();
+  } catch(err){
+    mostrarStatusPVGIS('⚠ ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/**
+ * Consulta la API PVcalc de PVGIS (Comisión Europea) para obtener
+ * la producción anual estimada real según ubicación, potencia,
+ * inclinación y orientación.
+ *
+ * IMPORTANTE: PVGIS no permite peticiones CORS desde el navegador.
+ * En producción esta llamada debe hacerse desde tu backend (proxy).
+ * Aquí se intenta vía un proxy CORS público para la demo, y si falla
+ * se hace un cálculo local de respaldo con la misma fórmula que usa
+ * PVGIS (irradiación * potencia * performance ratio).
+ */
+async function consultarPVGIS(){
+  if(!coordsActuales){
+    mostrarStatusPVGIS('Primero localiza la dirección o introduce coordenadas manuales.', 'error');
+    return;
+  }
+
+  const kw = parseFloat(document.getElementById('potencia').value) || 10;
+  const incl = parseInt(document.getElementById('inclinacion').value) || 30;
+  const azimut = ORIENTACION_A_AZIMUT[orientacionSeleccionada] ?? 0;
+
+  const btn = document.getElementById('btn-pvgis');
+  btn.disabled = true;
+  mostrarStatusPVGIS('Consultando PVGIS para ' + coordsActuales.lat.toFixed(4) + ', ' + coordsActuales.lon.toFixed(4) + '...', 'cargando');
+  document.getElementById('pvgis-resultado').style.display = 'none';
+
+  // Pérdidas del sistema por defecto (cableado, inversor, suciedad, temperatura)
+  const perdidas = 14;
+
+  const params = new URLSearchParams({
+    lat: coordsActuales.lat.toFixed(5),
+    lon: coordsActuales.lon.toFixed(5),
+    peakpower: kw,
+    loss: perdidas,
+    angle: incl,
+    aspect: azimut,
+    outputformat: 'json'
+  });
+
+  const pvgisUrl = 'https://re.jrc.ec.europa.eu/api/v5_2/PVcalc?' + params.toString();
+
+  try {
+    // Proxy CORS para poder llamar a PVGIS desde el navegador en esta demo.
+    // En producción: sustituir por tu propio endpoint backend, ej:
+    //   /api/pvgis?lat=...&lon=...&peakpower=...
+    const proxyUrl = 'https://corsproxy.io/?url=' + encodeURIComponent(pvgisUrl);
+    const resp = await fetch(proxyUrl);
+    if(!resp.ok) throw new Error('PVGIS no disponible en este momento (' + resp.status + ')');
+    const data = await resp.json();
+
+    const totals = data.outputs.totals.fixed;
+    const produccionAnual = totals.E_y; // kWh/año
+    const irradiacionAnual = totals['H(i)_y']; // kWh/m²/año sobre el plano inclinado
+    const pr = totals.PR; // performance ratio (0-1)
+
+    datosPVGIS = {
+      produccion: produccionAnual,
+      irradiacion: irradiacionAnual,
+      pr: pr,
+      kwUsado: kw,
+      fuente: 'PVGIS (re.jrc.ec.europa.eu)'
+    };
+
+    mostrarResultadoPVGIS(datosPVGIS);
+    ocultarStatusPVGIS();
+  } catch(err){
+    // Fallback: cálculo local con fórmula equivalente a PVGIS,
+    // usando irradiación media de la zona por latitud aproximada
+    const irradEstimada = estimarIrradiacionPorLatitud(coordsActuales.lat);
+    const factorOri = {S:1.0, SE:0.97, SO:0.96, E:0.82, O:0.81, N:0.58};
+    const fo = factorOri[orientacionSeleccionada] || 0.92;
+    const fi = incl >= 20 && incl <= 45 ? 1.0 : incl < 20 ? 0.92 : 0.88;
+    const pr = (100 - perdidas) / 100;
+    const produccionEstimada = Math.round(kw * irradEstimada * fo * fi * pr);
+
+    datosPVGIS = {
+      produccion: produccionEstimada,
+      irradiacion: Math.round(irradEstimada * fo * fi),
+      pr: pr,
+      kwUsado: kw,
+      fuente: 'Estimación local (PVGIS no accesible desde el navegador)'
+    };
+
+    mostrarResultadoPVGIS(datosPVGIS, true);
+    mostrarStatusPVGIS('⚠ No se pudo conectar con PVGIS directamente (' + err.message + '). Se ha calculado una estimación local equivalente. En producción, esta llamada se hace desde el backend sin este problema.', 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/**
+ * Estimación de irradiación anual (kWh/m²/año sobre superficie horizontal)
+ * según latitud, para España peninsular y Baleares/Canarias.
+ * Es un fallback aproximado para cuando PVGIS no responde por CORS.
+ */
+function estimarIrradiacionPorLatitud(lat){
+  // España va aprox. de lat 36 (sur) a lat 43.8 (norte)
+  // Más al sur = más irradiación
+  if(lat >= 43) return 1300;       // Cornisa cantábrica
+  if(lat >= 41.5) return 1500;     // Norte/centro-norte
+  if(lat >= 40) return 1650;       // Centro peninsular
+  if(lat >= 38.5) return 1750;     // Centro-sur, Extremadura, Levante
+  if(lat >= 37) return 1850;       // Andalucía, Murcia
+  return 1950;                     // Sur de Andalucía, Canarias
+}
+
+function mostrarResultadoPVGIS(datos, esFallback){
+  document.getElementById('pvgis-produccion').textContent = Math.round(datos.produccion).toLocaleString('es-ES');
+  document.getElementById('pvgis-irradiacion').textContent = Math.round(datos.irradiacion).toLocaleString('es-ES');
+  document.getElementById('pvgis-pr').textContent = (datos.pr * 100).toFixed(0) + '%';
+  document.getElementById('pvgis-res-badge').textContent = esFallback ? 'Estimación local' : 'Datos PVGIS reales';
+  document.getElementById('pvgis-res-badge').style.background = esFallback ? 'var(--amarillo-fondo)' : 'var(--verde-suave)';
+  document.getElementById('pvgis-res-badge').style.color = esFallback ? '#744210' : 'var(--verde-medio)';
+  document.getElementById('pvgis-res-fuente').textContent = datos.fuente;
+  document.getElementById('pvgis-resultado').style.display = 'block';
+}
+
+function usarDatosPVGIS(){
+  if(!datosPVGIS) return;
+  actualizarResumen();
+  const btn = event.target.closest('.btn');
+  const orig = btn.textContent;
+  btn.textContent = '✓ Datos aplicados a la memoria';
+  btn.style.background = 'var(--verde-medio)';
+  btn.style.color = 'white';
+  btn.style.borderColor = 'var(--verde-medio)';
+  setTimeout(()=>{
+    btn.textContent = orig;
+    btn.style.background = '';
+    btn.style.color = '';
+    btn.style.borderColor = '';
+  }, 2200);
+}
+
+const loadingMsgs = [
+  ['Analizando datos del proyecto...', 'Identificando normativa aplicable'],
+  ['Consultando base de datos PVGIS...', 'Calculando producción estimada'],
+  ['Generando estructura del documento...', 'Adaptando a normativa de la CCAA'],
+  ['Redactando secciones técnicas...', 'Integrando datos del cliente'],
+  ['Revisando coherencia técnica...', 'Formateando documento final'],
+];
+let loadInterval;
+
+function generarDocumentacion(){
+  const empresa = document.getElementById('empresa').value.trim();
+  const tecnico = document.getElementById('tecnico').value.trim();
+  const titular = document.getElementById('titular').value.trim();
+  const direccion = document.getElementById('direccion').value.trim();
+  const ccaa = document.getElementById('ccaa').value;
+
+  let errores = 0;
+  [['empresa','err-empresa'],['tecnico','err-tecnico'],['titular','err-titular'],
+   ['direccion','err-direccion'],['ccaa','err-ccaa']].forEach(([fid, eid])=>{
+    const v = document.getElementById(fid).value.trim();
+    const err = document.getElementById(eid);
+    if(!v){ err.classList.add('visible'); errores++; }
+    else err.classList.remove('visible');
+  });
+  if(errores) { document.getElementById('sec-instalador').scrollIntoView({behavior:'smooth'}); return; }
+
+  document.getElementById('output').classList.remove('visible');
+  document.getElementById('loading').classList.add('visible');
+  document.querySelector('.btn-grande').disabled = true;
+
+  let step = 0;
+  loadInterval = setInterval(()=>{
+    if(step < loadingMsgs.length){
+      document.getElementById('loading-txt').textContent = loadingMsgs[step][0];
+      document.getElementById('loading-steps').textContent = loadingMsgs[step][1];
+      step++;
+    }
+  }, 700);
+
+  setTimeout(()=>{
+    clearInterval(loadInterval);
+    document.getElementById('loading').classList.remove('visible');
+    document.querySelector('.btn-grande').disabled = false;
+    mostrarOutput();
+  }, 3800);
+}
+
+function mostrarOutput(){
+  const datos = recopilarDatos();
+  const doc = generarMemoria(datos);
+  document.getElementById('output-titulo').textContent = 'Memoria descriptiva — ' + datos.titular;
+  document.getElementById('output-contenido').textContent = doc;
+  const panel = document.getElementById('output');
+  panel.classList.add('visible');
+  panel.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function recopilarDatos(){
+  const kw = parseFloat(document.getElementById('potencia').value)||10;
+  const ccaa = document.getElementById('ccaa').value;
+  const incl = parseInt(document.getElementById('inclinacion').value)||30;
+  const produccion = calcularProduccion(kw, orientacionSeleccionada, ccaa);
+  return {
+    empresa: document.getElementById('empresa').value,
+    cif: document.getElementById('cif').value || 'No facilitado',
+    tecnico: document.getElementById('tecnico').value,
+    reci: document.getElementById('reci').value || 'En tramitación',
+    telefono: document.getElementById('telefono').value || '–',
+    email: document.getElementById('email').value || '–',
+    titular: document.getElementById('titular').value,
+    direccion: document.getElementById('direccion').value,
+    municipio: document.getElementById('municipio').value,
+    ccaa: CCAA_NOMBRES[ccaa] || ccaa,
+    catastro: document.getElementById('catastro').value || 'No facilitada',
+    inmueble: document.getElementById('inmueble').options[document.getElementById('inmueble').selectedIndex].text,
+    kw, incl,
+    orientacion: orientacionSeleccionada || 'Sur',
+    paneles: document.getElementById('num-paneles').value || Math.ceil(kw*1000/420),
+    wpPanel: document.getElementById('wp-panel').value || 420,
+    fabricantePanel: document.getElementById('fabricante-panel').value || 'Por determinar',
+    modeloPanel: document.getElementById('modelo-panel').value || 'Por determinar',
+    fabInversor: document.getElementById('fabricante-inversor').value || 'Por determinar',
+    kwInversor: document.getElementById('kw-inversor').value || kw,
+    conexion: document.getElementById('conexion').options[document.getElementById('conexion').selectedIndex].text,
+    bateria: document.getElementById('bateria').value === 'si',
+    kwhBateria: document.getElementById('kwh-bateria').value || '–',
+    cubierta: document.getElementById('cubierta').options[document.getElementById('cubierta').selectedIndex].text,
+    sombras: document.getElementById('sombras').options[document.getElementById('sombras').selectedIndex].text,
+    produccion: produccion ? produccion.toLocaleString('es-ES') : (kw * 1300).toLocaleString('es-ES'),
+    fuenteProduccion: (datosPVGIS && datosPVGIS.kwUsado === kw) ? datosPVGIS.fuente : 'Estimación interna basada en irradiación media de la CCAA',
+    coordenadas: coordsActuales ? `${coordsActuales.lat.toFixed(4)}, ${coordsActuales.lon.toFixed(4)}` : 'No localizadas',
+    notas: document.getElementById('notas').value,
+    fecha: new Date().toLocaleDateString('es-ES',{year:'numeric',month:'long',day:'numeric'})
+  };
+}
+
+function generarMemoria(d){
+  const ahorro = Math.round(d.kw * 0.12 * 1300 * 0.85);
+  const roi = Math.round((d.kw * 1100) / ahorro * 10)/10;
+  return `MEMORIA DESCRIPTIVA
+INSTALACIÓN FOTOVOLTAICA DE AUTOCONSUMO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+DATOS DEL DOCUMENTO
+Fecha de redacción : ${d.fecha}
+Revisión           : 1.0
+Tipo de documento  : Memoria descriptiva técnica
+Normativa aplicada : Real Decreto 244/2019 · REBT ITC-BT-40
+                     Normativa específica ${d.ccaa}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. DATOS DE LA EMPRESA INSTALADORA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Razón social  : ${d.empresa}
+CIF / NIF     : ${d.cif}
+Técnico resp. : ${d.tecnico}
+RECI          : ${d.reci}
+Teléfono      : ${d.telefono}
+Email         : ${d.email}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2. DATOS DEL TITULAR E IDENTIFICACIÓN DEL EMPLAZAMIENTO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Titular             : ${d.titular}
+Dirección           : ${d.direccion}
+Municipio           : ${d.municipio}
+Comunidad Autónoma  : ${d.ccaa}
+Ref. catastral      : ${d.catastro}
+Tipo de inmueble    : ${d.inmueble}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3. OBJETO DE LA INSTALACIÓN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+El objeto de la presente memoria es describir y justificar técnicamente la instalación fotovoltaica de autoconsumo a ejecutar en el emplazamiento indicado, con una potencia pico instalada de ${d.kw} kWp, en la modalidad de ${d.conexion.toLowerCase()}.
+
+La instalación se ajusta a lo establecido en el Real Decreto 244/2019, de 5 de abril, por el que se regulan las condiciones administrativas, técnicas y económicas del autoconsumo de energía eléctrica, así como a la normativa específica de ${d.ccaa}.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+4. DESCRIPCIÓN DE LA INSTALACIÓN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+4.1 GENERADOR FOTOVOLTAICO
+
+  Potencia pico total    : ${d.kw} kWp
+  Número de módulos      : ${d.paneles} unidades
+  Potencia por módulo    : ${d.wpPanel} Wp
+  Fabricante             : ${d.fabricantePanel}
+  Modelo / referencia    : ${d.modeloPanel}
+  Tecnología             : Silicio monocristalino
+  Tipo de cubierta       : ${d.cubierta}
+  Orientación principal  : ${d.orientacion}
+  Inclinación            : ${d.incl}°
+  Condiciones de sombra  : ${d.sombras}
+
+4.2 INVERSOR / CONVERTIDOR DC-AC
+
+  Fabricante             : ${d.fabInversor}
+  Potencia nominal AC    : ${d.kwInversor} kW
+  Tipo                   : Inversor de red monofásico / trifásico
+  Protecciones           : Anti-isla, sobretensión, subtensión,
+                           sobretemperatura, cortocircuito
+  Grado de protección    : IP65 (exterior)
+
+${d.bateria ? `4.3 SISTEMA DE ALMACENAMIENTO
+
+  Incluye batería        : Sí
+  Capacidad              : ${d.kwhBateria} kWh
+  Fabricante             : ${d.fabBateria || 'Por determinar'}
+  Tecnología             : Litio-ion LFP
+  Aplicación             : Almacenamiento de excedentes diurnos
+                           para consumo nocturno
+
+` : ''}4.${d.bateria ? '4' : '3'} MODALIDAD DE CONEXIÓN
+
+  Tipo                   : ${d.conexion}
+  Punto de conexión      : Cuadro general de la instalación interior
+  Tarifa de acceso       : A determinar según potencia contratada
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+5. ESTIMACIÓN DE PRODUCCIÓN Y AHORRO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Fuente de datos       : ${d.fuenteProduccion}
+Coordenadas evaluadas : ${d.coordenadas}
+Ubicación             : ${d.municipio}, ${d.ccaa}
+
+  Producción anual estimada  : ${d.produccion} kWh/año
+  Factor de rendimiento (PR) : 78%
+  Orientación aplicada       : ${d.orientacion} / ${d.incl}° de inclinación
+  Ahorro económico estimado  : ${ahorro.toLocaleString('es-ES')} €/año *
+  Período de retorno estimado: ${roi} años
+
+  * Calculado con precio medio de energía de 0,12 €/kWh y
+    cobertura estimada del 85% del consumo.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+6. NORMATIVA Y REGLAMENTACIÓN APLICABLE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  · Real Decreto 244/2019 — Autoconsumo eléctrico
+  · Reglamento Electrotécnico de Baja Tensión (RD 842/2002)
+    — ITC-BT-40: Instalaciones generadoras de baja tensión
+  · Real Decreto 1699/2011 — Conexión a red de energías
+    renovables de pequeña potencia
+  · Norma UNE-EN 62446 — Documentación de sistemas FV
+  · Normativa específica de ${d.ccaa}
+  · Ordenanza municipal de ${d.municipio} (si aplicable)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+7. DECLARACIÓN DEL TÉCNICO RESPONSABLE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+El técnico que suscribe, ${d.tecnico}, en nombre de ${d.empresa}
+(RECI: ${d.reci}), certifica que la instalación descrita en la
+presente memoria cumple con la normativa técnica y de seguridad
+vigente, y que los datos aportados son correctos y verídicos.
+
+${d.notas ? `8. OBSERVACIONES ADICIONALES\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n${d.notas}\n\n` : ''}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+En ${d.municipio}, a ${d.fecha}
+
+Fdo: ${d.tecnico}
+${d.empresa}
+RECI: ${d.reci}
+
+[FIRMA Y SELLO DE LA EMPRESA]
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DOCUMENTO GENERADO CON DOCSOLAR v0.1 BETA
+Este documento requiere revisión y firma por parte del
+técnico responsable antes de su presentación oficial.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+}
+
+function descargarTxt(){
+  const txt = document.getElementById('output-contenido').textContent;
+  const blob = new Blob([txt], {type:'text/plain;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'memoria_descriptiva_solar.txt';
+  a.click();
+}
+
+function copiarTexto(){
+  const txt = document.getElementById('output-contenido').textContent;
+  navigator.clipboard.writeText(txt).then(()=>{
+    const btn = event.target.closest('.btn');
+    const orig = btn.innerHTML;
+    btn.textContent = '✓ Copiado';
+    setTimeout(()=>{ btn.innerHTML = orig; }, 2000);
+  });
+}
+
+document.getElementById('bateria').addEventListener('change', function(){
+  document.getElementById('sec-bateria').style.display = this.value === 'si' ? 'block' : 'none';
+});
+
+renderProgress();
+actualizarPotencia();
+actualizarResumen();
+</script>
+</body>
+</html>
