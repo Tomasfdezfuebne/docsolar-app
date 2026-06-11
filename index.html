@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DocSolar — Genera tu documentación técnica</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
   :root {
     --verde-oscuro: #0D3D2A;
@@ -588,6 +589,20 @@
     gap: 10px;
     margin-top: 16px;
     flex-wrap: wrap;
+  }
+  .pdf-status {
+    margin-top: 12px;
+    font-size: 12px;
+    padding: 9px 12px;
+    border-radius: var(--radio-sm);
+    background: var(--verde-suave);
+    border: 1px solid var(--verde-borde);
+    color: var(--verde-oscuro);
+  }
+  .pdf-status.error {
+    background: var(--error-fondo);
+    border-color: #FEB2B2;
+    color: var(--error);
   }
 
   /* LOADING */
@@ -1407,9 +1422,13 @@
       </div>
       <pre class="output-pre" id="output-contenido"></pre>
       <div class="output-acciones">
-        <button class="btn btn-primario" onclick="descargarTxt()">
+        <button class="btn btn-primario" onclick="descargarPDF()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          Descargar PDF
+        </button>
+        <button class="btn btn-secundario" onclick="descargarTxt()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Descargar .txt
+          .txt
         </button>
         <button class="btn btn-secundario" onclick="copiarTexto()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
@@ -1420,6 +1439,7 @@
           Regenerar
         </button>
       </div>
+      <div class="pdf-status" id="pdf-status" style="display:none"></div>
     </div>
 
     </div><!-- fin form-columna -->
@@ -1500,6 +1520,7 @@ const CCAA_NOMBRES = {
 let orientacionSeleccionada = '';
 let coordsActuales = null; // {lat, lon, fuente}
 let datosPVGIS = null; // {produccion, irradiacion, pr}
+let ultimosDatosGenerados = null; // datos del proyecto usados en la última memoria generada
 const steps = [
   {label:'Instalador'},{label:'Cliente'},{label:'Sistema'},{label:'Orientación'},{label:'Documentos'}
 ];
@@ -1952,6 +1973,7 @@ function generarDocumentacion(){
 
 function mostrarOutput(){
   const datos = recopilarDatos();
+  ultimosDatosGenerados = datos; // se reutiliza para el PDF, sin re-leer el formulario
   const doc = generarMemoria(datos);
   document.getElementById('output-titulo').textContent = 'Memoria descriptiva — ' + datos.titular;
   document.getElementById('output-contenido').textContent = doc;
@@ -1989,6 +2011,7 @@ function recopilarDatos(){
     conexion: document.getElementById('conexion').options[document.getElementById('conexion').selectedIndex].text,
     bateria: document.getElementById('bateria').value === 'si',
     kwhBateria: document.getElementById('kwh-bateria').value || '–',
+    fabBateria: document.getElementById('fab-bateria').value || 'Por determinar',
     cubierta: document.getElementById('cubierta').options[document.getElementById('cubierta').selectedIndex].text,
     sombras: document.getElementById('sombras').options[document.getElementById('sombras').selectedIndex].text,
     produccion: produccion ? produccion.toLocaleString('es-ES') : (kw * 1300).toLocaleString('es-ES'),
@@ -2149,6 +2172,415 @@ function descargarTxt(){
   a.href = URL.createObjectURL(blob);
   a.download = 'memoria_descriptiva_solar.txt';
   a.click();
+}
+
+/* ============================================================
+   GENERACIÓN DE PDF (jsPDF)
+   ============================================================ */
+
+const PDF_VERDE_OSCURO = [13, 61, 42];
+const PDF_VERDE_MEDIO = [26, 107, 69];
+const PDF_VERDE_CLARO = [46, 158, 107];
+const PDF_TEXTO = [26, 26, 26];
+const PDF_TEXTO_SUAVE = [113, 128, 150];
+const PDF_BORDE = [209, 217, 212];
+const PDF_FONDO_SUAVE = [232, 245, 238];
+
+function mostrarStatusPDF(mensaje, esError){
+  const el = document.getElementById('pdf-status');
+  el.style.display = 'block';
+  el.className = 'pdf-status' + (esError ? ' error' : '');
+  el.textContent = mensaje;
+}
+
+function descargarPDF(){
+  if(!ultimosDatosGenerados){
+    mostrarStatusPDF('⚠ Genera primero la documentación antes de descargar el PDF.', true);
+    return;
+  }
+  if(typeof window.jspdf === 'undefined'){
+    mostrarStatusPDF('⚠ La librería de generación de PDF no se ha cargado. Comprueba tu conexión a internet y recarga la página.', true);
+    return;
+  }
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+    const d = ultimosDatosGenerados;
+
+    construirPDF(doc, d);
+
+    const nombreArchivo = 'memoria_descriptiva_' + (d.titular || 'proyecto')
+      .toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // quita acentos
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '') + '.pdf';
+
+    doc.save(nombreArchivo);
+    mostrarStatusPDF('✓ PDF generado correctamente: ' + nombreArchivo, false);
+  } catch(err){
+    mostrarStatusPDF('⚠ Error al generar el PDF: ' + err.message, true);
+  }
+}
+
+/**
+ * Construye el documento PDF completo: portada + secciones de contenido.
+ * Usa un sistema de "cursor" (posición Y actual) que avanza a medida que
+ * se añade contenido, y salta de página automáticamente cuando se acaba
+ * el espacio disponible.
+ */
+function construirPDF(doc, d){
+  const PAGINA_ANCHO = 210;
+  const PAGINA_ALTO = 297;
+  const MARGEN = 20;
+  const ANCHO_UTIL = PAGINA_ANCHO - MARGEN * 2;
+  const ALTO_MAX = PAGINA_ALTO - 25; // deja espacio para el pie de página
+
+  let y = MARGEN;
+  let pagina = 1;
+
+  // ---------- PORTADA ----------
+  doc.setFillColor(...PDF_VERDE_OSCURO);
+  doc.rect(0, 0, PAGINA_ANCHO, 80, 'F');
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.text('DOCSOLAR', MARGEN, 25);
+
+  doc.setFontSize(22);
+  doc.text('Memoria Descriptiva', MARGEN, 45);
+  doc.setFontSize(13);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Instalación fotovoltaica de autoconsumo', MARGEN, 55);
+
+  doc.setFontSize(10);
+  doc.text('Borrador generado automáticamente — pendiente de revisión técnica', MARGEN, 68);
+
+  // Bloque de datos clave en portada
+  let yPortada = 100;
+  doc.setTextColor(...PDF_TEXTO);
+
+  const datosPortada = [
+    ['Titular', d.titular],
+    ['Dirección', d.direccion],
+    ['Municipio', d.municipio + ', ' + d.ccaa],
+    ['Empresa instaladora', d.empresa],
+    ['Técnico responsable', d.tecnico],
+    ['Potencia instalada', d.kw + ' kWp'],
+    ['Fecha de redacción', d.fecha],
+  ];
+
+  doc.setFontSize(11);
+  datosPortada.forEach(([label, valor])=>{
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...PDF_VERDE_MEDIO);
+    doc.text(label + ':', MARGEN, yPortada);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...PDF_TEXTO);
+    doc.text(String(valor || '–'), MARGEN + 55, yPortada);
+    yPortada += 9;
+  });
+
+  // Línea separadora
+  doc.setDrawColor(...PDF_VERDE_CLARO);
+  doc.setLineWidth(0.8);
+  doc.line(MARGEN, yPortada + 5, PAGINA_ANCHO - MARGEN, yPortada + 5);
+
+  doc.setFontSize(9);
+  doc.setTextColor(...PDF_TEXTO_SUAVE);
+  doc.text('Este documento ha sido generado mediante asistencia de inteligencia artificial', MARGEN, yPortada + 15);
+  doc.text('y requiere revisión técnica completa antes de su presentación oficial.', MARGEN, yPortada + 21);
+
+  pintarPiePagina(doc, pagina);
+
+  // ---------- NUEVA PÁGINA: contenido ----------
+  doc.addPage();
+  pagina++;
+  y = MARGEN;
+
+  function saltoPaginaSiNecesario(espacioNecesario){
+    if(y + espacioNecesario > ALTO_MAX){
+      pintarPiePagina(doc, pagina);
+      doc.addPage();
+      pagina++;
+      y = MARGEN;
+    }
+  }
+
+  function tituloSeccion(numero, texto){
+    saltoPaginaSiNecesario(18);
+    doc.setFillColor(...PDF_VERDE_OSCURO);
+    doc.rect(MARGEN, y, ANCHO_UTIL, 9, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text(numero + '. ' + texto, MARGEN + 3, y + 6.3);
+    y += 14;
+  }
+
+  function subtitulo(texto){
+    saltoPaginaSiNecesario(10);
+    doc.setTextColor(...PDF_VERDE_MEDIO);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text(texto, MARGEN, y);
+    y += 7;
+  }
+
+  function parrafo(texto){
+    doc.setTextColor(...PDF_TEXTO);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9.5);
+    const lineas = doc.splitTextToSize(texto, ANCHO_UTIL);
+    lineas.forEach(linea=>{
+      saltoPaginaSiNecesario(6);
+      doc.text(linea, MARGEN, y);
+      y += 5;
+    });
+    y += 3;
+  }
+
+  /**
+   * Tabla simple de 2 columnas (etiqueta / valor), usada para datos
+   * técnicos estructurados. Cada par ocupa una fila.
+   */
+  function tablaDatos(filas){
+    const colEtiqueta = 65;
+    const altoFila = 7;
+    filas.forEach(([label, valor], i)=>{
+      saltoPaginaSiNecesario(altoFila);
+      const fondo = i % 2 === 0 ? [255,255,255] : PDF_FONDO_SUAVE;
+      doc.setFillColor(...fondo);
+      doc.rect(MARGEN, y - 5, ANCHO_UTIL, altoFila, 'F');
+      doc.setDrawColor(...PDF_BORDE);
+      doc.setLineWidth(0.2);
+      doc.rect(MARGEN, y - 5, ANCHO_UTIL, altoFila, 'S');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(...PDF_VERDE_OSCURO);
+      doc.text(String(label), MARGEN + 3, y);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(...PDF_TEXTO);
+      const valorTexto = doc.splitTextToSize(String(valor ?? '–'), ANCHO_UTIL - colEtiqueta - 6);
+      doc.text(valorTexto[0] || '–', MARGEN + colEtiqueta, y);
+
+      y += altoFila;
+    });
+    y += 5;
+  }
+
+  function avisoDestacado(texto, tipo){
+    // tipo: 'info' (verde) | 'warn' (amarillo)
+    const colorFondo = tipo === 'warn' ? [255, 251, 235] : PDF_FONDO_SUAVE;
+    const colorBorde = tipo === 'warn' ? [246, 173, 85] : PDF_VERDE_CLARO;
+    const colorTexto = tipo === 'warn' ? [116, 66, 16] : PDF_VERDE_OSCURO;
+
+    doc.setFontSize(9);
+    const lineas = doc.splitTextToSize(texto, ANCHO_UTIL - 8);
+    const altoBox = lineas.length * 4.6 + 6;
+    saltoPaginaSiNecesario(altoBox);
+
+    doc.setFillColor(...colorFondo);
+    doc.setDrawColor(...colorBorde);
+    doc.setLineWidth(0.4);
+    doc.rect(MARGEN, y - 4, ANCHO_UTIL, altoBox, 'FD');
+
+    doc.setTextColor(...colorTexto);
+    doc.setFont('helvetica', 'normal');
+    let yy = y + 1;
+    lineas.forEach(linea=>{
+      doc.text(linea, MARGEN + 4, yy);
+      yy += 4.6;
+    });
+    y += altoBox + 5;
+  }
+
+  // ---------- 1. DATOS DEL DOCUMENTO ----------
+  tituloSeccion(1, 'DATOS DEL DOCUMENTO');
+  tablaDatos([
+    ['Fecha de redacción', d.fecha],
+    ['Revisión', '1.0'],
+    ['Tipo de documento', 'Memoria descriptiva técnica'],
+    ['Normativa aplicada', 'RD 244/2019 · REBT ITC-BT-40'],
+    ['Normativa autonómica', d.ccaa],
+  ]);
+
+  // ---------- 2. EMPRESA INSTALADORA ----------
+  tituloSeccion(2, 'DATOS DE LA EMPRESA INSTALADORA');
+  tablaDatos([
+    ['Razón social', d.empresa],
+    ['CIF / NIF', d.cif],
+    ['Técnico responsable', d.tecnico],
+    ['RECI', d.reci],
+    ['Teléfono', d.telefono],
+    ['Email', d.email],
+  ]);
+
+  // ---------- 3. TITULAR Y EMPLAZAMIENTO ----------
+  tituloSeccion(3, 'DATOS DEL TITULAR Y EMPLAZAMIENTO');
+  tablaDatos([
+    ['Titular', d.titular],
+    ['Dirección', d.direccion],
+    ['Municipio', d.municipio],
+    ['Comunidad Autónoma', d.ccaa],
+    ['Referencia catastral', d.catastro],
+    ['Tipo de inmueble', d.inmueble],
+  ]);
+
+  // ---------- 4. OBJETO DE LA INSTALACIÓN ----------
+  tituloSeccion(4, 'OBJETO DE LA INSTALACIÓN');
+  parrafo(
+    'El objeto de la presente memoria es describir y justificar técnicamente la instalación ' +
+    'fotovoltaica de autoconsumo a ejecutar en el emplazamiento indicado, con una potencia pico ' +
+    'instalada de ' + d.kw + ' kWp, en la modalidad de ' + d.conexion.toLowerCase() + '.'
+  );
+  parrafo(
+    'La instalación se ajusta a lo establecido en el Real Decreto 244/2019, de 5 de abril, por el ' +
+    'que se regulan las condiciones administrativas, técnicas y económicas del autoconsumo de ' +
+    'energía eléctrica, así como a la normativa específica de ' + d.ccaa + '.'
+  );
+
+  // ---------- 5. DESCRIPCIÓN DE LA INSTALACIÓN ----------
+  tituloSeccion(5, 'DESCRIPCIÓN DE LA INSTALACIÓN');
+
+  subtitulo('5.1 Generador fotovoltaico');
+  tablaDatos([
+    ['Potencia pico total', d.kw + ' kWp'],
+    ['Número de módulos', d.paneles + ' unidades'],
+    ['Potencia por módulo', d.wpPanel + ' Wp'],
+    ['Fabricante', d.fabricantePanel],
+    ['Modelo / referencia', d.modeloPanel],
+    ['Tipo de cubierta', d.cubierta],
+    ['Orientación principal', d.orientacion],
+    ['Inclinación', d.incl + '°'],
+    ['Condiciones de sombra', d.sombras],
+  ]);
+
+  subtitulo('5.2 Inversor / convertidor DC-AC');
+  tablaDatos([
+    ['Fabricante', d.fabInversor],
+    ['Potencia nominal AC', d.kwInversor + ' kW'],
+    ['Tipo', 'Inversor de red mono/trifásico'],
+    ['Protecciones', 'Anti-isla, sobretensión, subtensión, sobretemperatura, cortocircuito'],
+    ['Grado de protección', 'IP65 (exterior)'],
+  ]);
+
+  if(d.bateria){
+    subtitulo('5.3 Sistema de almacenamiento');
+    tablaDatos([
+      ['Incluye batería', 'Sí'],
+      ['Capacidad', d.kwhBateria + ' kWh'],
+      ['Fabricante', d.fabBateria || 'Por determinar'],
+      ['Tecnología', 'Litio-ion LFP'],
+    ]);
+  }
+
+  subtitulo((d.bateria ? '5.4' : '5.3') + ' Modalidad de conexión');
+  tablaDatos([
+    ['Tipo', d.conexion],
+    ['Punto de conexión', 'Cuadro general de la instalación interior'],
+    ['Tarifa de acceso', 'A determinar según potencia contratada'],
+  ]);
+
+  // ---------- 6. PRODUCCIÓN Y AHORRO ----------
+  const ahorro = Math.round(d.kw * 0.12 * 1300 * 0.85);
+  const roi = Math.round((d.kw * 1100) / ahorro * 10) / 10;
+
+  tituloSeccion(6, 'ESTIMACIÓN DE PRODUCCIÓN Y AHORRO');
+  tablaDatos([
+    ['Fuente de datos', d.fuenteProduccion],
+    ['Coordenadas evaluadas', d.coordenadas],
+    ['Producción anual estimada', d.produccion + ' kWh/año'],
+    ['Factor de rendimiento (PR)', '78%'],
+    ['Orientación / inclinación', d.orientacion + ' / ' + d.incl + '°'],
+    ['Ahorro económico estimado', ahorro.toLocaleString('es-ES') + ' €/año *'],
+    ['Período de retorno estimado', roi + ' años'],
+  ]);
+  parrafo('* Calculado con precio medio de energía de 0,12 €/kWh y cobertura estimada del 85% del consumo.');
+
+  // ---------- 7. NORMATIVA APLICABLE ----------
+  tituloSeccion(7, 'NORMATIVA Y REGLAMENTACIÓN APLICABLE');
+  parrafo('· Real Decreto 244/2019 — Autoconsumo eléctrico');
+  parrafo('· Reglamento Electrotécnico de Baja Tensión (RD 842/2002) — ITC-BT-40: Instalaciones generadoras de baja tensión');
+  parrafo('· Real Decreto 1699/2011 — Conexión a red de energías renovables de pequeña potencia');
+  parrafo('· Norma UNE-EN 62446 — Documentación de sistemas FV');
+  parrafo('· Normativa específica de ' + d.ccaa);
+  parrafo('· Ordenanza municipal de ' + d.municipio + ' (si aplicable)');
+
+  // ---------- 8. DECLARACIÓN DEL TÉCNICO ----------
+  tituloSeccion(8, 'DECLARACIÓN DEL TÉCNICO RESPONSABLE');
+  parrafo(
+    'El técnico que suscribe, ' + d.tecnico + ', en nombre de ' + d.empresa + ' (RECI: ' + d.reci + '), ' +
+    'certifica que la instalación descrita en la presente memoria cumple con la normativa técnica y ' +
+    'de seguridad vigente, y que los datos aportados son correctos y verídicos.'
+  );
+
+  // ---------- 9. OBSERVACIONES (si las hay) ----------
+  if(d.notas && d.notas.trim()){
+    tituloSeccion(9, 'OBSERVACIONES ADICIONALES');
+    parrafo(d.notas);
+  }
+
+  // ---------- AVISO FINAL ----------
+  saltoPaginaSiNecesario(40);
+  y += 5;
+  avisoDestacado(
+    'DOCUMENTO GENERADO AUTOMÁTICAMENTE — BORRADOR PENDIENTE DE REVISIÓN. ' +
+    'Este documento ha sido generado mediante asistencia de inteligencia artificial y requiere ' +
+    'revisión técnica completa, verificación normativa actualizada y firma por parte de un técnico ' +
+    'competente antes de su presentación ante cualquier organismo oficial.',
+    'warn'
+  );
+
+  // ---------- FIRMA ----------
+  saltoPaginaSiNecesario(35);
+  y += 8;
+  doc.setTextColor(...PDF_TEXTO);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9.5);
+  doc.text('En ' + d.municipio + ', a ' + d.fecha, MARGEN, y);
+  y += 16;
+  doc.setDrawColor(...PDF_TEXTO_SUAVE);
+  doc.setLineWidth(0.2);
+  doc.line(MARGEN, y, MARGEN + 70, y);
+  y += 5;
+  doc.setFont('helvetica', 'bold');
+  doc.text('Fdo: ' + d.tecnico, MARGEN, y);
+  y += 5;
+  doc.setFont('helvetica', 'normal');
+  doc.text(d.empresa, MARGEN, y);
+  y += 5;
+  doc.text('RECI: ' + d.reci, MARGEN, y);
+
+  pintarPiePagina(doc, pagina);
+
+  // ---------- NUMERACIÓN DE PÁGINAS (segunda pasada) ----------
+  const totalPaginas = doc.internal.getNumberOfPages();
+  for(let p = 1; p <= totalPaginas; p++){
+    doc.setPage(p);
+    doc.setFontSize(8);
+    doc.setTextColor(...PDF_TEXTO_SUAVE);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Página ' + p + ' de ' + totalPaginas, PAGINA_ANCHO - MARGEN, PAGINA_ALTO - 10, { align: 'right' });
+  }
+}
+
+function pintarPiePagina(doc, pagina){
+  const PAGINA_ANCHO = 210;
+  const PAGINA_ALTO = 297;
+  const MARGEN = 20;
+
+  doc.setDrawColor(...PDF_BORDE);
+  doc.setLineWidth(0.2);
+  doc.line(MARGEN, PAGINA_ALTO - 15, PAGINA_ANCHO - MARGEN, PAGINA_ALTO - 15);
+
+  doc.setFontSize(8);
+  doc.setTextColor(...PDF_TEXTO_SUAVE);
+  doc.setFont('helvetica', 'normal');
+  doc.text('DocSolar · Borrador generado automáticamente, pendiente de revisión técnica', MARGEN, PAGINA_ALTO - 10);
 }
 
 function copiarTexto(){
