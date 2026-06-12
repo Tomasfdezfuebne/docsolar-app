@@ -2,33 +2,27 @@
 //
 // Función serverless (Vercel) que recibe los datos del proyecto desde el
 // formulario y llama a la API de Claude (Anthropic) para redactar la
-// memoria descriptiva de forma adaptada al proyecto concreto, en vez de
-// usar la plantilla fija del frontend.
+// MEMORIA DESCRIPTIVA siguiendo la estructura profesional estándar que usan
+// las ingenierías en España y que pide la administración para tramitación.
 //
 // SEGURIDAD:
-//   - La API key NUNCA está en este archivo ni en el frontend. Se lee de
-//     la variable de entorno ANTHROPIC_API_KEY, configurada en Vercel
-//     (Settings → Environment Variables). Así nunca llega a GitHub.
-//   - No se ponen cabeceras CORS permisivas (Access-Control-Allow-Origin: *)
-//     a propósito: este endpoint cuesta dinero por llamada, así que solo
-//     debe poder llamarlo tu propio frontend (mismo dominio). Una petición
-//     desde otro origen será bloqueada por el navegador.
+//   - La API key se lee de la variable de entorno ANTHROPIC_API_KEY (Vercel),
+//     nunca está en el código ni llega a GitHub.
+//   - Sin CORS permisivo: solo lo llama tu propio frontend (mismo dominio).
 //
-// Una vez desplegado, estará disponible en:
-//   https://docsolar-app.vercel.app/api/generar-memoria
+// FORMATO DE SALIDA (markup ligero que el PDF del frontend sabe maquetar):
+//   # 1. TÍTULO        -> cabecera de sección
+//   ## 4.1. Subtítulo  -> subsección
+//   - Campo: Valor     -> fila de tabla de datos (varias seguidas = tabla)
+//   * texto            -> viñeta de lista
+//   (línea normal)     -> párrafo de texto
 
-// ─────────────────────────────────────────────────────────────
-// Base normativa por comunidad autónoma.
-// Extremadura está más detallada (es la zona de prueba / Incalexa).
-// Para el resto se inyecta lo que haya; si no hay, la IA usa solo
-// normativa estatal y marca lo autonómico como "a verificar".
-// ─────────────────────────────────────────────────────────────
 const NORMATIVA_CCAA = {
   "Extremadura":
-    "Órgano competente: Dirección General de Industria, Energía y Minas (Junta de Extremadura), tramitación a través de SEXPE/sede electrónica. " +
-    "Instalaciones de autoconsumo > 50 kWp pueden requerir autorización administrativa previa; por debajo, suele bastar comunicación previa / declaración responsable de baja tensión. " +
+    "Órgano competente: Dirección General de Industria, Energía y Minas (Junta de Extremadura), tramitación a través de la sede electrónica. " +
+    "Instalaciones de autoconsumo > 50 kWp pueden requerir autorización administrativa previa; por debajo suele bastar comunicación previa / declaración responsable de baja tensión. " +
     "Alta irradiación (de las mayores de España). Distribuidora habitual en la zona: i-DE (Grupo Iberdrola). " +
-    "Verificar siempre la convocatoria autonómica de subvenciones vigente y los plazos del registro de autoconsumo.",
+    "Verificar la convocatoria autonómica de subvenciones vigente y los plazos del registro de autoconsumo.",
   "Andalucía":
     "Órgano competente: Industria de la Junta de Andalucía. Instalaciones > 100 kWp pueden requerir evaluación de impacto ambiental simplificada. Verificar tramitación telemática y subvenciones autonómicas vigentes.",
   "Madrid":
@@ -51,32 +45,26 @@ const NORMATIVA_CCAA = {
     "Tramitación autonómica. Una de las regiones líderes en fotovoltaica en suelo. Verificar convocatorias y plazos."
 };
 
-// ─────────────────────────────────────────────────────────────
-// SYSTEM PROMPT — rol y reglas fijas (el "cinturón de seguridad").
-// ─────────────────────────────────────────────────────────────
-const SYSTEM_PROMPT = `Eres un técnico proyectista experto en instalaciones fotovoltaicas de autoconsumo en España, especializado en la redacción de memorias descriptivas técnicas para su tramitación administrativa.
+const SYSTEM_PROMPT = `Eres un ingeniero técnico industrial experto en la redacción de MEMORIAS DESCRIPTIVAS de instalaciones fotovoltaicas de autoconsumo en España, para su tramitación ante la administración (legalización de baja tensión).
 
-Tu tarea es redactar la MEMORIA DESCRIPTIVA de una instalación fotovoltaica a partir de los datos del proyecto que se te facilitan en formato JSON, en español de España, con tono técnico-profesional, claro y formal.
+Redactas el documento a partir de los datos del proyecto (en JSON), en español de España, con tono técnico, formal y profesional, siguiendo la estructura estándar que usan las ingenierías del sector.
+
+FORMATO DE SALIDA OBLIGATORIO (markup ligero; NO uses Markdown con asteriscos de negrita, NO uses líneas de guiones decorativas):
+- Cabecera de sección principal: una línea que empiece por "# " seguida del número y título en mayúsculas. Ej: "# 1. OBJETO Y ANTECEDENTES".
+- Subsección: una línea que empiece por "## ". Ej: "## 4.1. Generador fotovoltaico".
+- Dato estructurado (para tablas): una línea que empiece por "- " con formato "- Campo: Valor". Pon juntas todas las filas de datos de un mismo bloque, una por línea.
+- Viñeta de lista: una línea que empiece por "* ".
+- Párrafos de texto: líneas normales, sin prefijo. Separa los bloques con una línea en blanco.
 
 REGLAS OBLIGATORIAS (no las incumplas nunca):
+1. NO INVENTES NORMATIVA. Cita solo normativa estatal que conoces con seguridad (RD 244/2019 de autoconsumo; REBT RD 842/2002, en especial ITC-BT-40; RD 1699/2011; UNE-EN 62446). Para la normativa autonómica usa SOLO el contexto que se te proporcione; si no hay, escribe "normativa autonómica aplicable (a verificar por el técnico)" sin inventar decretos, números ni plazos.
+2. NO INVENTES DATOS. Usa exclusivamente los del JSON. Si un campo viene como "Por determinar", "No facilitado", "En tramitación" o similar, refléjalo así.
+3. NO INVENTES CÁLCULOS DE INGENIERÍA. No des secciones de cable, caídas de tensión, intensidades de cortocircuito ni valores de puesta a tierra concretos. Descríbelos cualitativamente e indica que "se dimensionarán y justificarán en el anexo de cálculos del proyecto, conforme al REBT" (caída de tensión en CC y CA inferior a los límites reglamentarios, conductores de cobre, etc.).
+4. USA LENGUAJE CONDICIONAL en cumplimiento: "la instalación se ha diseñado conforme a...", "se ajustará a lo establecido en...". Nunca afirmes de forma categórica que "cumple" un decreto.
+5. Termina SIEMPRE indicando que es un borrador generado con asistencia de IA, pendiente de cálculos, esquema unifilar y firma de técnico competente.
 
-1. NO INVENTES NORMATIVA. Cita únicamente normativa estatal que conoces con seguridad (Real Decreto 244/2019 de autoconsumo; REBT RD 842/2002, especialmente ITC-BT-40; RD 1699/2011; norma UNE-EN 62446). Para la normativa autonómica, usa SOLO la información que se te proporcione en el bloque de contexto normativo. Si no se proporciona, escribe "normativa autonómica aplicable (a verificar por el técnico)" en lugar de inventar decretos, números o plazos.
+Devuelve ÚNICAMENTE el cuerpo de la memoria en el markup descrito, sin preámbulos ni comentarios fuera del documento. No incluyas la portada ni el bloque de firma final (los añade el sistema).`;
 
-2. NO INVENTES DATOS DEL PROYECTO. Usa exclusivamente los datos del JSON. Si un campo viene como "Por determinar", "No facilitado", "En tramitación" o similar, refléjalo así en el documento, no lo rellenes con valores inventados.
-
-3. USA LENGUAJE CONDICIONAL Y NO CONCLUSIVO en materia de cumplimiento. No afirmes de forma categórica "la instalación cumple X decreto". Usa fórmulas como "la instalación se ha diseñado conforme a..." o "se ajustará a lo establecido en...". El documento es un borrador que debe revisar y firmar un técnico competente.
-
-4. NO incluyas cálculos de ingeniería que no se deriven directamente de los datos aportados (secciones de cable, caídas de tensión exactas, etc.). Si son necesarios, indícalos como "a dimensionar/justificar en el proyecto técnico".
-
-5. Estructura el documento en secciones numeradas y con encabezados claros. Mantén una estructura coherente y profesional.
-
-6. Termina SIEMPRE con un aviso de que se trata de un borrador generado con asistencia de IA, pendiente de revisión y firma técnica antes de su presentación oficial.
-
-Devuelve ÚNICAMENTE el texto de la memoria, sin preámbulos tipo "Aquí tienes..." ni comentarios finales fuera del documento.`;
-
-// ─────────────────────────────────────────────────────────────
-// Construye el mensaje de usuario: contexto normativo + datos + formato.
-// ─────────────────────────────────────────────────────────────
 function construirMensajeUsuario(d) {
   const ccaa = d.ccaa || "";
   const contextoNormativo = NORMATIVA_CCAA[ccaa]
@@ -85,48 +73,75 @@ function construirMensajeUsuario(d) {
 
   return `${contextoNormativo}
 
-DATOS DEL PROYECTO (en JSON):
+DATOS DEL PROYECTO (JSON):
 ${JSON.stringify(d, null, 2)}
 
-INSTRUCCIONES DE SALIDA:
-Redacta la memoria descriptiva con esta estructura mínima (puedes adaptar la numeración según haya o no batería y observaciones):
+Redacta la memoria descriptiva con ESTA estructura de secciones (usa el markup indicado; incluye la 4.4 de almacenamiento solo si hay batería):
 
-1. Datos del documento (fecha, revisión, normativa aplicada)
-2. Datos de la empresa instaladora
-3. Datos del titular y emplazamiento
-4. Objeto de la instalación
-5. Descripción técnica de la instalación (generador fotovoltaico, inversor, almacenamiento si aplica, modalidad de conexión)
-6. Estimación de producción y ahorro (usa los datos de producción y la fuente indicada; si la fuente es PVGIS, menciónalo como dato de referencia oficial)
-7. Normativa y reglamentación aplicable
-8. Declaración del técnico responsable
-9. Observaciones adicionales (solo si el campo "notas" tiene contenido)
+# 1. OBJETO Y ANTECEDENTES
+(párrafo: objeto de la memoria, potencia pico, modalidad, finalidad de autoconsumo)
 
-Adapta la redacción al tipo de inmueble, la modalidad de conexión y las condiciones de sombra y orientación reales del proyecto. Si hay notas del técnico, intégralas de forma coherente en el documento. Cierra con el aviso de borrador pendiente de revisión.`;
+# 2. TITULAR Y EMPLAZAMIENTO
+(filas "- Campo: Valor": Titular, Dirección, Municipio, Comunidad Autónoma, Referencia catastral, Tipo de inmueble, Coordenadas)
+
+# 3. DESCRIPCIÓN GENERAL DE LA INSTALACIÓN
+(párrafo: tipo de instalación, modalidad de conexión, descripción del emplazamiento y de la solución adoptada)
+
+# 4. DESCRIPCIÓN DE LOS EQUIPOS Y COMPONENTES
+## 4.1. Generador fotovoltaico
+(filas de datos de módulos + breve párrafo)
+## 4.2. Estructura soporte
+(párrafo: tipo de cubierta, orientación, inclinación; sobrecargas a justificar por el técnico)
+## 4.3. Inversor
+(filas de datos del inversor + párrafo con protecciones integradas)
+## 4.4. Sistema de almacenamiento
+(solo si hay batería)
+## 4.5. Cableado y canalizaciones
+(párrafo: conductores de cobre, caída de tensión a justificar en anexo de cálculos según REBT)
+## 4.6. Protecciones
+(párrafo: protecciones CC y CA, protección de interconexión y anti-isla según RD 1699/2011, magnetotérmicos y diferenciales; valores a justificar)
+## 4.7. Puesta a tierra
+(párrafo)
+## 4.8. Equipo de medida
+(párrafo: contador bidireccional, a solicitar a la distribuidora)
+
+# 5. MODALIDAD DE CONEXIÓN Y AUTOCONSUMO
+(párrafo + filas: modalidad, punto de conexión)
+
+# 6. ESTIMACIÓN DE PRODUCCIÓN ENERGÉTICA
+(filas: Fuente de datos, Producción anual estimada, Factor de rendimiento (PR), Orientación/inclinación; si la fuente es PVGIS menciónalo como referencia oficial de la Comisión Europea + breve párrafo)
+
+# 7. ESTUDIO ECONÓMICO
+(filas: Ahorro económico estimado, Período de retorno + párrafo aclaratorio de hipótesis)
+
+# 8. NORMATIVA Y REGLAMENTACIÓN APLICABLE
+(viñetas "* ")
+
+# 9. DOCUMENTOS ANEXOS AL PROYECTO
+(viñetas "* ": esquema unifilar, anexo de cálculos eléctricos, fichas técnicas de equipos, estudio de producción, estudio básico de seguridad y salud, gestión de residuos — los que correspondan)
+
+# 10. CONCLUSIÓN
+(párrafo)
+
+# 11. DECLARACIÓN DEL TÉCNICO RESPONSABLE
+(párrafo en lenguaje condicional)
+
+Si el campo "notas" tiene contenido, intégralo de forma natural en las secciones que correspondan. Adapta la redacción al tipo de inmueble, la modalidad y las condiciones de sombra y orientación reales.`;
 }
 
-// ─────────────────────────────────────────────────────────────
-// Handler principal
-// ─────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
-  // Solo se permite POST (los datos del proyecto viajan en el cuerpo).
-  if (req.method === "OPTIONS") {
-    return res.status(204).end();
-  }
+  if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Método no permitido. Usa POST." });
   }
 
-  // Comprobación de la API key (en el servidor).
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     return res.status(500).json({
-      error:
-        "Falta la variable de entorno ANTHROPIC_API_KEY en Vercel. Configúrala en Settings → Environment Variables y vuelve a desplegar."
+      error: "Falta la variable de entorno ANTHROPIC_API_KEY en Vercel."
     });
   }
 
-  // Parseo del cuerpo (Vercel suele parsear JSON automáticamente, pero
-  // por robustez aceptamos también string).
   let d;
   try {
     d = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
@@ -137,17 +152,13 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Faltan los datos del proyecto." });
   }
 
-  // Validación mínima de campos imprescindibles.
   const faltan = ["empresa", "tecnico", "titular", "direccion", "ccaa"].filter(
     (k) => !d[k] || String(d[k]).trim() === ""
   );
   if (faltan.length) {
-    return res.status(400).json({
-      error: "Faltan campos obligatorios: " + faltan.join(", ")
-    });
+    return res.status(400).json({ error: "Faltan campos obligatorios: " + faltan.join(", ") });
   }
 
-  // Llamada a la API de Claude (Messages API).
   try {
     const respuesta = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -158,7 +169,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
-        max_tokens: 4000,
+        max_tokens: 5000,
         system: SYSTEM_PROMPT,
         messages: [{ role: "user", content: construirMensajeUsuario(d) }]
       })
@@ -174,19 +185,14 @@ export default async function handler(req, res) {
     }
 
     const data = await respuesta.json();
-
-    // Extraemos el texto de los bloques de tipo "text".
     const texto = (data.content || [])
-      .filter((bloque) => bloque.type === "text")
-      .map((bloque) => bloque.text)
+      .filter((b) => b.type === "text")
+      .map((b) => b.text)
       .join("\n")
       .trim();
 
     if (!texto) {
-      return res.status(502).json({
-        error: "La respuesta de Claude no contenía texto.",
-        datosCompletos: data
-      });
+      return res.status(502).json({ error: "La respuesta de Claude no contenía texto." });
     }
 
     return res.status(200).json({
