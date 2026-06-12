@@ -76,7 +76,7 @@ function construirMensajeUsuario(d) {
 DATOS DEL PROYECTO (JSON):
 ${JSON.stringify(d, null, 2)}
 
-Redacta la memoria descriptiva con ESTA estructura de secciones (usa el markup indicado; incluye la 4.4 de almacenamiento solo si hay batería):
+Redacta la memoria descriptiva con ESTA estructura de secciones (usa el markup indicado). IMPORTANTE: las subsecciones del apartado 4 deben ir SIEMPRE numeradas de forma consecutiva 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, sin saltarte ningún número aunque no haya batería.
 
 # 1. OBJETO Y ANTECEDENTES
 (párrafo: objeto de la memoria, potencia pico, modalidad, finalidad de autoconsumo)
@@ -95,7 +95,7 @@ Redacta la memoria descriptiva con ESTA estructura de secciones (usa el markup i
 ## 4.3. Inversor
 (filas de datos del inversor + párrafo con protecciones integradas)
 ## 4.4. Sistema de almacenamiento
-(solo si hay batería)
+(si hay batería, describe sus datos; si NO hay batería, indica en una frase que la instalación no incorpora sistema de almacenamiento y que la energía se destina a autoconsumo instantáneo y, en su caso, vertido de excedentes)
 ## 4.5. Cableado y canalizaciones
 (párrafo: conductores de cobre, caída de tensión a justificar en anexo de cálculos según REBT)
 ## 4.6. Protecciones
@@ -109,7 +109,7 @@ Redacta la memoria descriptiva con ESTA estructura de secciones (usa el markup i
 (párrafo + filas: modalidad, punto de conexión)
 
 # 6. ESTIMACIÓN DE PRODUCCIÓN ENERGÉTICA
-(filas: Fuente de datos, Producción anual estimada, Factor de rendimiento (PR), Orientación/inclinación; si la fuente es PVGIS menciónalo como referencia oficial de la Comisión Europea + breve párrafo)
+(filas: Fuente de datos, Coordenadas evaluadas, Producción anual estimada, Irradiación anual, Factor de rendimiento (PR), Orientación/inclinación. Usa EXACTAMENTE los valores de los campos "produccion", "irradiacion" y "performanceRatio" del JSON; no los cambies ni los redondees de otra forma. Si la fuente es PVGIS menciónalo como referencia oficial de la Comisión Europea + breve párrafo)
 
 # 7. ESTUDIO ECONÓMICO
 (filas: Ahorro económico estimado, Período de retorno + párrafo aclaratorio de hipótesis)
@@ -169,7 +169,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
-        max_tokens: 5000,
+        max_tokens: 8000,
         system: SYSTEM_PROMPT,
         messages: [{ role: "user", content: construirMensajeUsuario(d) }]
       })
