@@ -1521,6 +1521,7 @@ const CCAA_NOMBRES = {
 let orientacionSeleccionada = '';
 let coordsActuales = null; // {lat, lon, fuente}
 let datosPVGIS = null; // {produccion, irradiacion, pr}
+let produccionAplicada = null; // snapshot fijado al pulsar "Usar estos datos": {produccion, irradiacion, pr, fuente, kw}
 let ultimosDatosGenerados = null; // datos del proyecto usados en la última memoria generada
 let ultimaMemoriaTexto = null;    // texto en markup de la última memoria (IA o plantilla), para el PDF
 const steps = [
@@ -1573,10 +1574,12 @@ function actualizarInclinacion(){
 }
 
 function invalidarPVGIS(){
-  if(datosPVGIS){
-    datosPVGIS = null;
+  const habiaDatos = datosPVGIS || produccionAplicada;
+  datosPVGIS = null;
+  produccionAplicada = null;
+  if(habiaDatos){
     const resultado = document.getElementById('pvgis-resultado');
-    if(resultado.style.display !== 'none'){
+    if(resultado && resultado.style.display !== 'none'){
       resultado.style.display = 'none';
       mostrarStatusPVGIS('Los parámetros han cambiado. Vuelve a calcular para obtener datos PVGIS actualizados.', 'cargando');
     }
@@ -1911,6 +1914,15 @@ function mostrarResultadoPVGIS(datos, esFallback){
 
 function usarDatosPVGIS(){
   if(!datosPVGIS) return;
+  // Fijamos un snapshot que se usará al generar, aunque el botón vuelva a su
+  // estado normal. Solo se borra si el usuario cambia potencia/orientación/inclinación.
+  produccionAplicada = {
+    produccion: datosPVGIS.produccion,
+    irradiacion: datosPVGIS.irradiacion,
+    pr: datosPVGIS.pr,
+    fuente: datosPVGIS.fuente,
+    kw: datosPVGIS.kwUsado
+  };
   actualizarResumen();
   const btn = event.target.closest('.btn');
   const orig = btn.textContent;
@@ -2051,7 +2063,22 @@ function recopilarDatos(){
   const kw = parseFloat(document.getElementById('potencia').value)||10;
   const ccaa = document.getElementById('ccaa').value;
   const incl = parseInt(document.getElementById('inclinacion').value)||30;
-  const produccion = calcularProduccion(kw, orientacionSeleccionada, ccaa);
+  // Prioridad de la producción: 1) snapshot PVGIS aplicado, 2) PVGIS vivo, 3) estimación.
+  let produccionFinal, fuenteFinal, irradiacionFinal = null, prFinal = null;
+  if(produccionAplicada && produccionAplicada.kw === kw){
+    produccionFinal = Math.round(produccionAplicada.produccion);
+    fuenteFinal = produccionAplicada.fuente;
+    irradiacionFinal = produccionAplicada.irradiacion;
+    prFinal = produccionAplicada.pr;
+  } else if(datosPVGIS && datosPVGIS.kwUsado === kw){
+    produccionFinal = Math.round(datosPVGIS.produccion);
+    fuenteFinal = datosPVGIS.fuente;
+    irradiacionFinal = datosPVGIS.irradiacion;
+    prFinal = datosPVGIS.pr;
+  } else {
+    produccionFinal = calcularProduccion(kw, orientacionSeleccionada, ccaa) || Math.round(kw * 1300);
+    fuenteFinal = 'Estimación interna basada en irradiación media de la CCAA';
+  }
   return {
     empresa: document.getElementById('empresa').value,
     cif: document.getElementById('cif').value || 'No facilitado',
@@ -2079,8 +2106,10 @@ function recopilarDatos(){
     fabBateria: document.getElementById('fab-bateria').value || 'Por determinar',
     cubierta: document.getElementById('cubierta').options[document.getElementById('cubierta').selectedIndex].text,
     sombras: document.getElementById('sombras').options[document.getElementById('sombras').selectedIndex].text,
-    produccion: produccion ? produccion.toLocaleString('es-ES') : (kw * 1300).toLocaleString('es-ES'),
-    fuenteProduccion: (datosPVGIS && datosPVGIS.kwUsado === kw) ? datosPVGIS.fuente : 'Estimación interna basada en irradiación media de la CCAA',
+    produccion: produccionFinal.toLocaleString('es-ES'),
+    fuenteProduccion: fuenteFinal,
+    irradiacion: irradiacionFinal ? Math.round(irradiacionFinal).toLocaleString('es-ES') + ' kWh/m²/año' : 'A determinar en el estudio de producción',
+    performanceRatio: (typeof prFinal === 'number' && !isNaN(prFinal)) ? (prFinal * 100).toFixed(0) + '%' : 'A determinar en el anexo de cálculos',
     coordenadas: coordsActuales ? `${coordsActuales.lat.toFixed(4)}, ${coordsActuales.lon.toFixed(4)}` : 'No localizadas',
     notas: document.getElementById('notas').value,
     fecha: new Date().toLocaleDateString('es-ES',{year:'numeric',month:'long',day:'numeric'})
@@ -2097,7 +2126,10 @@ function generarMemoria(d){
 - Tecnología: Litio-ion LFP (a confirmar)
 El sistema de almacenamiento permitirá desplazar el consumo de los excedentes diurnos a las horas sin producción solar. Su dimensionado se justificará en el anexo de cálculos.
 
-` : '';
+` : `## 4.4. Sistema de almacenamiento
+La presente instalación no incorpora sistema de almacenamiento por baterías. Toda la energía generada se destina al autoconsumo instantáneo y, en su caso, al vertido de excedentes a la red.
+
+`;
 
   return `# 1. OBJETO Y ANTECEDENTES
 La presente memoria tiene por objeto describir y justificar técnicamente la instalación solar fotovoltaica de autoconsumo a ejecutar en el emplazamiento indicado, con una potencia pico instalada de ${d.kw} kWp, en la modalidad de ${conexionLow}. La instalación se ha diseñado conforme a lo establecido en el Real Decreto 244/2019, de 5 de abril, así como en el Reglamento Electrotécnico de Baja Tensión y en la normativa autonómica aplicable de ${d.ccaa}.
@@ -2153,8 +2185,10 @@ La instalación se acoge a la modalidad de ${conexionLow}, conforme al RD 244/20
 
 # 6. ESTIMACIÓN DE PRODUCCIÓN ENERGÉTICA
 - Fuente de datos: ${d.fuenteProduccion}
+- Coordenadas evaluadas: ${d.coordenadas}
 - Producción anual estimada: ${d.produccion} kWh/año
-- Factor de rendimiento (PR): 78% (estimado)
+- Irradiación anual: ${d.irradiacion}
+- Factor de rendimiento (PR): ${d.performanceRatio}
 - Orientación / inclinación: ${d.orientacion} / ${d.incl}°
 La estimación de producción se ha obtenido a partir de la ubicación, orientación e inclinación indicadas. Los valores definitivos se confirmarán en el estudio de producción del proyecto.
 
