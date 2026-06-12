@@ -62,6 +62,7 @@ REGLAS OBLIGATORIAS (no las incumplas nunca):
 3. NO INVENTES CÁLCULOS DE INGENIERÍA. No des secciones de cable, caídas de tensión, intensidades de cortocircuito ni valores de puesta a tierra concretos. Descríbelos cualitativamente e indica que "se dimensionarán y justificarán en el anexo de cálculos del proyecto, conforme al REBT" (caída de tensión en CC y CA inferior a los límites reglamentarios, conductores de cobre, etc.).
 4. USA LENGUAJE CONDICIONAL en cumplimiento: "la instalación se ha diseñado conforme a...", "se ajustará a lo establecido en...". Nunca afirmes de forma categórica que "cumple" un decreto.
 5. Termina SIEMPRE indicando que es un borrador generado con asistencia de IA, pendiente de cálculos, esquema unifilar y firma de técnico competente.
+6. NO USES subíndices, superíndices Unicode ni símbolos especiales que puedan no renderizarse en PDF. Escribe "CO2" (no "CO₂"), "m2" o "m²" para metros cuadrados está permitido, "kWh/m2" si dudas. Usa guiones normales (-) y comillas normales.
 
 Devuelve ÚNICAMENTE el cuerpo de la memoria en el markup descrito, sin preámbulos ni comentarios fuera del documento. No incluyas la portada ni el bloque de firma final (los añade el sistema).`;
 
