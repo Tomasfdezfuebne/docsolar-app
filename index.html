@@ -1268,6 +1268,88 @@
       </div>
     </div>
 
+    <!-- SECCIÓN ANEXO DE CÁLCULOS -->
+    <div class="seccion" id="sec-anexo">
+      <div class="seccion-header">
+        <div class="seccion-icono">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="4" y="2" width="16" height="20" rx="2"/>
+            <line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="16" y2="10"/>
+            <line x1="8" y1="14" x2="12" y2="14"/><line x1="8" y1="18" x2="12" y2="18"/>
+          </svg>
+        </div>
+        <div>
+          <div class="seccion-titulo">Anexo de cálculos eléctricos</div>
+          <div class="seccion-subtitulo">Sección de cable, caída de tensión y protecciones (REBT)</div>
+        </div>
+      </div>
+
+      <div class="campo" style="margin-bottom:16px;">
+        <label>¿Incluir el anexo de cálculos en el documento?</label>
+        <select id="incluir-anexo" onchange="actualizarResumen()">
+          <option value="si" selected>Sí — añade el Anexo I con los cálculos</option>
+          <option value="no">No</option>
+        </select>
+        <span class="campo-hint">Los cálculos son deterministas (no IA): se muestran las fórmulas y supuestos para que el técnico los valide.</span>
+      </div>
+
+      <div class="grid-2">
+        <div class="campo">
+          <label>Longitud tramo CC (m)</label>
+          <input type="number" id="long-cc" placeholder="20" min="1" step="1" value="20">
+          <span class="campo-hint">Distancia módulos → inversor</span>
+        </div>
+        <div class="campo">
+          <label>Longitud tramo CA (m)</label>
+          <input type="number" id="long-ca" placeholder="10" min="1" step="1" value="10">
+          <span class="campo-hint">Distancia inversor → cuadro</span>
+        </div>
+        <div class="campo">
+          <label>Sistema eléctrico</label>
+          <select id="sistema-ca">
+            <option value="auto" selected>Automático según inversor</option>
+            <option value="mono">Monofásico (230 V)</option>
+            <option value="tri">Trifásico (400 V)</option>
+          </select>
+        </div>
+        <div class="campo">
+          <label>Nº de ramas (strings) en paralelo</label>
+          <input type="number" id="n-strings" placeholder="2" min="1" step="1" value="2">
+          <span class="campo-hint">Cómo se agrupan los módulos</span>
+        </div>
+      </div>
+
+      <hr class="separador" style="margin:16px 0;">
+
+      <div class="grid-2">
+        <div class="campo">
+          <label>Isc del módulo (A) <span class="campo-hint">(opcional)</span></label>
+          <input type="number" id="isc-mod" placeholder="se estima del Wp" step="0.01" min="1">
+          <span class="campo-hint">Corriente de cortocircuito (ficha técnica)</span>
+        </div>
+        <div class="campo">
+          <label>Impp del módulo (A) <span class="campo-hint">(opcional)</span></label>
+          <input type="number" id="impp-mod" placeholder="se estima del Wp" step="0.01" min="1">
+          <span class="campo-hint">Corriente en el punto de máxima potencia</span>
+        </div>
+        <div class="campo">
+          <label>Caída tensión máx. CC (%)</label>
+          <input type="number" id="dv-cc" placeholder="1.0" step="0.1" min="0.1" value="1.0">
+        </div>
+        <div class="campo">
+          <label>Caída tensión máx. CA (%)</label>
+          <input type="number" id="dv-ca" placeholder="0.5" step="0.1" min="0.1" value="0.5">
+        </div>
+      </div>
+
+      <div class="aviso aviso-info" style="margin-top:16px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <span>Las secciones se dimensionan por caída de tensión. La verificación por intensidad admisible (Iz), cortocircuitos y configuración de strings la confirma el técnico. El límite total de caída CC+CA es 1,5% (ITC-BT-40).</span>
+      </div>
+    </div>
+
     <!-- SECCIÓN 5: DOCUMENTOS A GENERAR -->
     <div class="seccion" id="sec-docs">
       <div class="seccion-header">
@@ -1998,10 +2080,11 @@ async function generarYMostrar(){
   avisoFallbackIA = null;
 
   try {
+    const { anexo, incluirAnexo, ...datosIA } = datos; // los cálculos no van a la IA
     const resp = await fetch('/api/generar-memoria', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(datos)
+      body: JSON.stringify(datosIA)
     });
     const data = await resp.json();
     if(!resp.ok || !data.memoria){
@@ -2021,7 +2104,11 @@ async function generarYMostrar(){
 function pintarOutput(datos, texto, fuente){
   ultimaMemoriaTexto = texto; // markup en bruto, para el PDF
   document.getElementById('output-titulo').textContent = 'Memoria descriptiva — ' + datos.titular;
-  document.getElementById('output-contenido').textContent = formatearParaPantalla(texto);
+  let pantalla = formatearParaPantalla(texto);
+  if(datos.incluirAnexo && datos.anexo){
+    pantalla += '\n\n' + '─'.repeat(40) + anexoTextoPantalla(datos.anexo);
+  }
+  document.getElementById('output-contenido').textContent = pantalla;
 
   const badge = document.getElementById('output-badge');
   const aviso = document.getElementById('ia-status');
@@ -2079,7 +2166,7 @@ function recopilarDatos(){
     produccionFinal = calcularProduccion(kw, orientacionSeleccionada, ccaa) || Math.round(kw * 1300);
     fuenteFinal = 'Estimación interna basada en irradiación media de la CCAA';
   }
-  return {
+  const datos = {
     empresa: document.getElementById('empresa').value,
     cif: document.getElementById('cif').value || 'No facilitado',
     tecnico: document.getElementById('tecnico').value,
@@ -2114,6 +2201,150 @@ function recopilarDatos(){
     notas: document.getElementById('notas').value,
     fecha: new Date().toLocaleDateString('es-ES',{year:'numeric',month:'long',day:'numeric'})
   };
+
+  // Anexo de cálculos eléctricos (determinista)
+  datos.incluirAnexo = document.getElementById('incluir-anexo').value === 'si';
+  if(datos.incluirAnexo){
+    const sisSel = document.getElementById('sistema-ca').value;
+    const opts = {
+      longitudCC: document.getElementById('long-cc').value,
+      longitudCA: document.getElementById('long-ca').value,
+      sistema: sisSel === 'auto' ? null : sisSel,
+      nStrings: document.getElementById('n-strings').value,
+      iscModulo: document.getElementById('isc-mod').value,
+      imppModulo: document.getElementById('impp-mod').value,
+      caidaCC: document.getElementById('dv-cc').value,
+      caidaCA: document.getElementById('dv-ca').value
+    };
+    try { datos.anexo = calcularAnexoElectrico(datos, opts); }
+    catch(e){ datos.anexo = null; datos.incluirAnexo = false; }
+  }
+  return datos;
+}
+
+/* ============================================================
+   MOTOR DE CÁLCULO ELÉCTRICO — Anexo de cálculos (REBT)
+   Cálculo DETERMINISTA (no IA). Fórmulas y supuestos a la vista
+   para que el técnico competente los verifique.
+   ============================================================ */
+const SECCIONES_NORM = [1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95, 120, 150, 185, 240];
+const CALIBRES_NORM = [6, 10, 13, 16, 20, 25, 32, 40, 50, 63, 80, 100, 125, 160];
+const FUSIBLES_PV = [10, 15, 16, 20, 25, 30];
+const GAMMA_CU = 56; // m/(ohm·mm²), cobre a 20°C (ajustable por el técnico)
+
+function seccionNormalizada(sMin){ return SECCIONES_NORM.find(s => s >= sMin) || SECCIONES_NORM[SECCIONES_NORM.length-1]; }
+function calibreNormalizado(iMin){ return CALIBRES_NORM.find(c => c >= iMin) || CALIBRES_NORM[CALIBRES_NORM.length-1]; }
+function fusiblePV(iMin){ return FUSIBLES_PV.find(f => f >= iMin) || FUSIBLES_PV[FUSIBLES_PV.length-1]; }
+function r2(x){ return Math.round(x*100)/100; }
+function r1(x){ return Math.round(x*10)/10; }
+function nf(x, dec){ if(dec===undefined) dec=2; return Number(x).toLocaleString('es-ES',{minimumFractionDigits:dec, maximumFractionDigits:dec}); }
+
+function estimarParametrosModulo(wp){
+  const vmpp = 31.5;
+  const impp = wp / vmpp;
+  const isc = impp * 1.06;
+  return { vmpp, impp: r2(impp), isc: r2(isc) };
+}
+
+function calcularAnexoElectrico(d, o){
+  o = o || {};
+  const wp = parseFloat(d.wpPanel) || 420;
+  const est = estimarParametrosModulo(wp);
+  const isc = parseFloat(o.iscModulo) || est.isc;
+  const impp = parseFloat(o.imppModulo) || est.impp;
+  const nStrings = parseInt(o.nStrings) || 1;
+  const Lcc = parseFloat(o.longitudCC) || 20;
+  const Lca = parseFloat(o.longitudCA) || 10;
+  const sistema = o.sistema || (parseFloat(d.kwInversor) > 6 ? 'tri' : 'mono');
+  const Vca = sistema === 'tri' ? 400 : 230;
+  const cosphi = 1;
+  const dvCCpct = parseFloat(o.caidaCC) || 1.0;
+  const dvCApct = parseFloat(o.caidaCA) || 0.5;
+
+  // TRAMO CC
+  const Icc = r2(nStrings * impp);
+  const IccDiseno = r2(1.25 * nStrings * isc);
+  const modulosSerie = Math.max(1, Math.round((parseFloat(d.paneles) || 24) / nStrings));
+  const VccString = r1(est.vmpp * modulosSerie);
+  const dvCC_V = VccString * dvCCpct / 100;
+  const sCC_min = (2 * Lcc * Icc) / (GAMMA_CU * dvCC_V);
+  const sCC = seccionNormalizada(Math.max(sCC_min, 4));
+  const dvCC_real_V = (2 * Lcc * Icc) / (GAMMA_CU * sCC);
+  const dvCC_real_pct = (dvCC_real_V / VccString) * 100;
+
+  // TRAMO CA
+  const Pinv = (parseFloat(d.kwInversor) || parseFloat(d.kw) || 10) * 1000;
+  const Ica = sistema === 'tri' ? Pinv / (Math.sqrt(3) * Vca * cosphi) : Pinv / (Vca * cosphi);
+  const IcaR = r2(Ica);
+  const IcaDiseno = r2(1.25 * Ica);
+  const dvCA_V = Vca * dvCApct / 100;
+  const sCA_min = sistema === 'tri'
+    ? (Math.sqrt(3) * Lca * IcaR * cosphi) / (GAMMA_CU * dvCA_V)
+    : (2 * Lca * IcaR * cosphi) / (GAMMA_CU * dvCA_V);
+  const sCA = seccionNormalizada(Math.max(sCA_min, 6));
+  const dvCA_real_V = sistema === 'tri'
+    ? (Math.sqrt(3) * Lca * IcaR * cosphi) / (GAMMA_CU * sCA)
+    : (2 * Lca * IcaR * cosphi) / (GAMMA_CU * sCA);
+  const dvCA_real_pct = (dvCA_real_V / Vca) * 100;
+
+  // PROTECCIONES
+  const fusibleCC = fusiblePV(1.5 * isc);
+  const magnetoCA = calibreNormalizado(IcaDiseno);
+  const polosCA = sistema === 'tri' ? '4P (3F+N)' : '2P (F+N)';
+  const diferencial = { sensibilidad: 30, tipo: 'A', polos: polosCA };
+  const dvTotalPct = r2(dvCC_real_pct + dvCA_real_pct);
+
+  return {
+    supuestos: { gamma: GAMMA_CU, cosphi, sistema, Vca, isc, impp, vmpp: est.vmpp, nStrings, modulosSerie, VccString, Lcc, Lca, dvCCpct, dvCApct, estimadoModulo: !o.iscModulo },
+    cc: { Icc, IccDiseno, VccString, dvAdmPct: dvCCpct, dvAdmV: r2(dvCC_V), sMin: r2(sCC_min), sNorm: sCC, dvRealV: r2(dvCC_real_V), dvRealPct: r2(dvCC_real_pct), cumple: dvCC_real_pct <= dvCCpct },
+    ca: { Ica: IcaR, IcaDiseno, V: Vca, dvAdmPct: dvCApct, dvAdmV: r2(dvCA_V), sMin: r2(sCA_min), sNorm: sCA, dvRealV: r2(dvCA_real_V), dvRealPct: r2(dvCA_real_pct), cumple: dvCA_real_pct <= dvCApct },
+    total: { dvPct: dvTotalPct, limite: 1.5, cumple: dvTotalPct <= 1.5 },
+    protecciones: { fusibleCC, magnetoCA, polosCA, diferencial }
+  };
+}
+
+/** Versión en texto plano del anexo, para mostrar en pantalla y en el .txt */
+function anexoTextoPantalla(a){
+  const s = a.supuestos, cc = a.cc, ca = a.ca, p = a.protecciones;
+  const ok = b => b ? 'CUMPLE' : 'NO CUMPLE — revisar';
+  const sis = s.sistema === 'tri' ? 'Trifásico 400 V' : 'Monofásico 230 V';
+  return `
+ANEXO I — CÁLCULOS ELÉCTRICOS (orientativos, a validar por el técnico)
+
+Supuestos de cálculo:
+   Conductividad del cobre (K): ${s.gamma} m/(ohm·mm²)
+   Sistema: ${sis}   ·   cos phi: ${s.cosphi}
+   Módulo: Isc ${nf(s.isc)} A · Impp ${nf(s.impp)} A · Vmpp ${nf(s.vmpp,1)} V${s.estimadoModulo ? ' (estimados a partir de Wp)' : ''}
+   Configuración: ${s.nStrings} rama(s) en paralelo · ${s.modulosSerie} módulos en serie por rama
+   Longitudes: tramo CC ${s.Lcc} m · tramo CA ${s.Lca} m
+
+1) Tramo de corriente continua (generador -> inversor)
+   Corriente de línea: I = ${s.nStrings} x Impp = ${nf(cc.Icc)} A
+   Tensión de la rama: U_string = ${nf(s.modulosSerie,0)} x Vmpp = ${nf(cc.VccString,1)} V
+   Caída admisible: ${nf(cc.dvAdmPct,1)}% de ${nf(cc.VccString,1)} V = ${nf(cc.dvAdmV)} V
+   Sección por caída: S = 2·L·I/(K·u) = 2·${s.Lcc}·${nf(cc.Icc)}/(${s.gamma}·${nf(cc.dvAdmV)}) = ${nf(cc.sMin)} mm²
+   Sección normalizada adoptada: ${cc.sNorm} mm² (mínimo práctico 4 mm² en CC)
+   Caída real: U = 2·L·I/(K·S) = ${nf(cc.dvRealV)} V = ${nf(cc.dvRealPct)}%  ->  ${ok(cc.cumple)} (límite ${nf(cc.dvAdmPct,1)}%)
+
+2) Tramo de corriente alterna (inversor -> cuadro)
+   Corriente: I = ${s.sistema==='tri' ? 'P/(raiz(3)·V·cos phi)' : 'P/(V·cos phi)'} = ${nf(ca.Ica)} A
+   Caída admisible: ${nf(ca.dvAdmPct,1)}% de ${ca.V} V = ${nf(ca.dvAdmV)} V
+   Sección por caída: S = ${s.sistema==='tri'?'raiz(3)':'2'}·L·I/(K·u) = ${nf(ca.sMin)} mm²
+   Sección normalizada adoptada: ${ca.sNorm} mm² (mínimo práctico 6 mm² en CA)
+   Caída real: U = ${nf(ca.dvRealV)} V = ${nf(ca.dvRealPct)}%  ->  ${ok(ca.cumple)} (límite ${nf(ca.dvAdmPct,1)}%)
+
+   Caída de tensión total (CC + CA): ${nf(a.total.dvPct)}%  ->  ${ok(a.total.cumple)} (límite ITC-BT-40: ${nf(a.total.limite,1)}%)
+
+3) Dimensionado de protecciones
+   Fusible CC por rama (gPV): >= 1,5 x Isc = ${nf(1.5*s.isc)} A  ->  ${p.fusibleCC} A
+   Interruptor magnetotérmico CA: In >= 1,25 x I = ${nf(ca.IcaDiseno)} A  ->  ${p.magnetoCA} A, curva C, ${p.polosCA}
+   Interruptor diferencial CA: ${p.diferencial.sensibilidad} mA, tipo ${p.diferencial.tipo}, ${p.diferencial.polos}
+
+NOTA: Las secciones se han dimensionado por caída de tensión. La verificación
+por intensidad máxima admisible (Iz) según método de instalación (ITC-BT-19),
+las corrientes de cortocircuito y la coordinación de protecciones deben ser
+confirmadas por el técnico competente. La configuración de strings debe
+verificarse frente a la ventana de tensión MPPT y la tensión máxima del inversor.`;
 }
 
 function generarMemoria(d){
@@ -2284,7 +2515,33 @@ function descargarPDF(){
  * se añade contenido, y salta de página automáticamente cuando se acaba
  * el espacio disponible.
  */
+/**
+ * jsPDF (fuente helvetica estándar) no soporta ciertos caracteres Unicode
+ * fuera de Latin-1 (subíndices, algunos símbolos), y cuando los encuentra
+ * puede corromper el cálculo de saltos de línea y "comerse" texto. Aquí los
+ * convertimos a equivalentes seguros antes de pintar.
+ */
+function sanitizarTextoPDF(texto){
+  if(!texto) return '';
+  const sub = {'₀':'0','₁':'1','₂':'2','₃':'3','₄':'4','₅':'5','₆':'6','₇':'7','₈':'8','₉':'9'};
+  const sup = {'⁰':'0','⁴':'4','⁵':'5','⁶':'6','⁷':'7','⁸':'8','⁹':'9'};
+  return texto
+    .replace(/[₀-₉]/g, c => sub[c] || c)
+    .replace(/[⁰⁴-⁹]/g, c => sup[c] || c)
+    .replace(/≤/g, '<=').replace(/≥/g, '>=')
+    .replace(/→/g, '->').replace(/←/g, '<-')
+    .replace(/√/g, 'raiz').replace(/Δ/g, 'D').replace(/[γϒ]/g, 'g')
+    .replace(/[ΩΩ]/g, 'ohm').replace(/[Φφ]/g, 'fi').replace(/[ηρ]/g, m => m==='η'?'n':'r')
+    .replace(/[✓✔]/g, 'OK').replace(/[✗✘]/g, 'X')
+    .replace(/≈/g, '~').replace(/±/g, '+/-').replace(/·/g, '\u00B7')
+    .replace(/[‚‛]/g, ',').replace(/[“”]/g, '"').replace(/[‘’]/g, "'")
+    .replace(/…/g, '...')
+    .replace(/\u00A0/g, ' ')
+    .replace(/[\u2009\u202F\u200B]/g, ' ');
+}
+
 function construirPDF(doc, d, textoMemoria){
+  textoMemoria = sanitizarTextoPDF(textoMemoria);
   const PAGINA_ANCHO = 210;
   const PAGINA_ALTO = 297;
   const MARGEN = 18;
@@ -2462,6 +2719,60 @@ function construirPDF(doc, d, textoMemoria){
     flush(); parrafo(t);
   });
   flush();
+
+  // ───────────── ANEXO I — CÁLCULOS ELÉCTRICOS ─────────────
+  if(d.anexo){
+    const a = d.anexo, s = a.supuestos, cc = a.cc, ca = a.ca, p = a.protecciones;
+    const okTxt = b => b ? 'CUMPLE' : 'NO CUMPLE - revisar';
+    const sisTxt = s.sistema === 'tri' ? 'Trifasico 400 V' : 'Monofasico 230 V';
+
+    doc.addPage(); y = MARGEN;
+    cabecera('ANEXO I - CÁLCULOS ELÉCTRICOS');
+    parrafo('Los siguientes cálculos se han obtenido por métodos deterministas a partir de los datos del proyecto, dimensionando las secciones por caída de tensión conforme al REBT. Tienen carácter orientativo y deben ser verificados y validados por el técnico competente.');
+
+    subt('Supuestos de cálculo');
+    tablaDatos([
+      ['Conductividad del cobre (K)', s.gamma + ' m/(ohm·mm²) a 20 °C'],
+      ['Sistema eléctrico', sisTxt + '   ·   cos phi = ' + s.cosphi],
+      ['Módulo: Isc / Impp / Vmpp', nf(s.isc)+' A / '+nf(s.impp)+' A / '+nf(s.vmpp,1)+' V'+(s.estimadoModulo?' (estimados de Wp)':'')],
+      ['Configuración', s.nStrings+' rama(s) en paralelo · '+s.modulosSerie+' módulos en serie/rama'],
+      ['Longitud tramo CC / CA', s.Lcc+' m / '+s.Lca+' m']
+    ]);
+
+    subt('1. Tramo de corriente continua (generador -> inversor)');
+    tablaDatos([
+      ['Corriente de línea (I = n·Impp)', nf(cc.Icc)+' A'],
+      ['Corriente de diseño (1,25·n·Isc)', nf(cc.IccDiseno)+' A'],
+      ['Tensión de la rama (Vmpp·nº serie)', nf(cc.VccString,1)+' V'],
+      ['Caída admisible', nf(cc.dvAdmPct,1)+' % = '+nf(cc.dvAdmV)+' V'],
+      ['Sección mínima por caída (S=2·L·I/(K·u))', nf(cc.sMin)+' mm²'],
+      ['Sección normalizada adoptada', cc.sNorm+' mm²'],
+      ['Caída de tensión real', nf(cc.dvRealV)+' V  ('+nf(cc.dvRealPct)+' %)'],
+      ['Resultado', okTxt(cc.cumple)+' (límite '+nf(cc.dvAdmPct,1)+' %)']
+    ]);
+
+    subt('2. Tramo de corriente alterna (inversor -> cuadro)');
+    tablaDatos([
+      ['Corriente de línea', nf(ca.Ica)+' A'],
+      ['Corriente de diseño (1,25·I)', nf(ca.IcaDiseno)+' A'],
+      ['Tensión de servicio', ca.V+' V'],
+      ['Caída admisible', nf(ca.dvAdmPct,1)+' % = '+nf(ca.dvAdmV)+' V'],
+      ['Sección mínima por caída', nf(ca.sMin)+' mm²'],
+      ['Sección normalizada adoptada', ca.sNorm+' mm²'],
+      ['Caída de tensión real', nf(ca.dvRealV)+' V  ('+nf(ca.dvRealPct)+' %)'],
+      ['Resultado', okTxt(ca.cumple)+' (límite '+nf(ca.dvAdmPct,1)+' %)']
+    ]);
+    parrafo('Caída de tensión total (CC + CA): ' + nf(a.total.dvPct) + ' %. ' + okTxt(a.total.cumple) + ' respecto al límite del 1,5 % entre generador y punto de conexión (ITC-BT-40).');
+
+    subt('3. Dimensionado de protecciones');
+    tablaDatos([
+      ['Fusible CC por rama (gPV)', '>= 1,5·Isc = '+nf(1.5*s.isc)+' A  ->  '+p.fusibleCC+' A'],
+      ['Magnetotérmico CA', 'In >= '+nf(ca.IcaDiseno)+' A  ->  '+p.magnetoCA+' A, curva C, '+p.polosCA],
+      ['Diferencial CA', p.diferencial.sensibilidad+' mA, tipo '+p.diferencial.tipo+', '+p.diferencial.polos]
+    ]);
+
+    avisoWarn('Las secciones se han dimensionado por caída de tensión. La verificación por intensidad máxima admisible (Iz) según método de instalación (ITC-BT-19), las corrientes de cortocircuito, la coordinación de protecciones y la configuración de strings frente a la ventana MPPT y tensión máxima del inversor deben ser confirmadas por el técnico competente.');
+  }
 
   // ───────────── AVISO FINAL + FIRMA ─────────────
   y += 3;
