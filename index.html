@@ -1522,6 +1522,7 @@ let orientacionSeleccionada = '';
 let coordsActuales = null; // {lat, lon, fuente}
 let datosPVGIS = null; // {produccion, irradiacion, pr}
 let ultimosDatosGenerados = null; // datos del proyecto usados en la última memoria generada
+let ultimaMemoriaTexto = null;    // texto en markup de la última memoria (IA o plantilla), para el PDF
 const steps = [
   {label:'Instalador'},{label:'Cliente'},{label:'Sistema'},{label:'Orientación'},{label:'Documentos'}
 ];
@@ -2006,8 +2007,9 @@ async function generarYMostrar(){
 }
 
 function pintarOutput(datos, texto, fuente){
+  ultimaMemoriaTexto = texto; // markup en bruto, para el PDF
   document.getElementById('output-titulo').textContent = 'Memoria descriptiva — ' + datos.titular;
-  document.getElementById('output-contenido').textContent = texto;
+  document.getElementById('output-contenido').textContent = formatearParaPantalla(texto);
 
   const badge = document.getElementById('output-badge');
   const aviso = document.getElementById('ia-status');
@@ -2026,6 +2028,23 @@ function pintarOutput(datos, texto, fuente){
   const panel = document.getElementById('output');
   panel.classList.add('visible');
   panel.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+/**
+ * Convierte el markup ligero (# ## - *) en texto limpio y legible para
+ * mostrarlo en pantalla y en el .txt / copiar. El PDF usa el markup en bruto.
+ */
+function formatearParaPantalla(texto){
+  return (texto || '').replace(/\r/g,'').split('\n').map(l=>{
+    let s = l.replace(/\*\*/g,'');
+    const t = s.trim();
+    if(t.startsWith('# '))  return '\n' + t.slice(2).toUpperCase();
+    if(t.startsWith('## ')) return t.slice(3);
+    const mData = t.match(/^[-•]\s*(.+?):\s*(.*)$/);
+    if(mData) return '   ' + mData[1].trim() + ': ' + mData[2].trim();
+    if(t.startsWith('* ')) return '   • ' + t.slice(2);
+    return s;
+  }).join('\n').replace(/\n{3,}/g,'\n\n').trim();
 }
 
 function recopilarDatos(){
@@ -2071,144 +2090,100 @@ function recopilarDatos(){
 function generarMemoria(d){
   const ahorro = Math.round(d.kw * 0.12 * 1300 * 0.85);
   const roi = Math.round((d.kw * 1100) / ahorro * 10)/10;
-  return `MEMORIA DESCRIPTIVA
-INSTALACIÓN FOTOVOLTAICA DE AUTOCONSUMO
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  const conexionLow = (d.conexion || '').toLowerCase();
+  const bloqueBateria = d.bateria ? `## 4.4. Sistema de almacenamiento
+- Capacidad: ${d.kwhBateria} kWh
+- Fabricante: ${d.fabBateria}
+- Tecnología: Litio-ion LFP (a confirmar)
+El sistema de almacenamiento permitirá desplazar el consumo de los excedentes diurnos a las horas sin producción solar. Su dimensionado se justificará en el anexo de cálculos.
 
-DATOS DEL DOCUMENTO
-Fecha de redacción : ${d.fecha}
-Revisión           : 1.0
-Tipo de documento  : Memoria descriptiva técnica
-Normativa aplicada : Real Decreto 244/2019 · REBT ITC-BT-40
-                     Normativa específica ${d.ccaa}
+` : '';
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1. DATOS DE LA EMPRESA INSTALADORA
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  return `# 1. OBJETO Y ANTECEDENTES
+La presente memoria tiene por objeto describir y justificar técnicamente la instalación solar fotovoltaica de autoconsumo a ejecutar en el emplazamiento indicado, con una potencia pico instalada de ${d.kw} kWp, en la modalidad de ${conexionLow}. La instalación se ha diseñado conforme a lo establecido en el Real Decreto 244/2019, de 5 de abril, así como en el Reglamento Electrotécnico de Baja Tensión y en la normativa autonómica aplicable de ${d.ccaa}.
 
-Razón social  : ${d.empresa}
-CIF / NIF     : ${d.cif}
-Técnico resp. : ${d.tecnico}
-RECI          : ${d.reci}
-Teléfono      : ${d.telefono}
-Email         : ${d.email}
+# 2. TITULAR Y EMPLAZAMIENTO
+- Titular: ${d.titular}
+- Dirección: ${d.direccion}
+- Municipio: ${d.municipio}
+- Comunidad Autónoma: ${d.ccaa}
+- Referencia catastral: ${d.catastro}
+- Tipo de inmueble: ${d.inmueble}
+- Coordenadas: ${d.coordenadas}
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-2. DATOS DEL TITULAR E IDENTIFICACIÓN DEL EMPLAZAMIENTO
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 3. DESCRIPCIÓN GENERAL DE LA INSTALACIÓN
+Se proyecta una instalación solar fotovoltaica conectada a la red interior del inmueble, en la modalidad de ${conexionLow}, destinada a cubrir parte de la demanda eléctrica del titular. El generador se ubicará sobre ${(d.cubierta || '').toLowerCase()}, con orientación ${d.orientacion} e inclinación de ${d.incl}°. Las condiciones de sombra consideradas son: ${(d.sombras || '').toLowerCase()}.
 
-Titular             : ${d.titular}
-Dirección           : ${d.direccion}
-Municipio           : ${d.municipio}
-Comunidad Autónoma  : ${d.ccaa}
-Ref. catastral      : ${d.catastro}
-Tipo de inmueble    : ${d.inmueble}
+# 4. DESCRIPCIÓN DE LOS EQUIPOS Y COMPONENTES
+## 4.1. Generador fotovoltaico
+- Potencia pico total: ${d.kw} kWp
+- Número de módulos: ${d.paneles} unidades
+- Potencia por módulo: ${d.wpPanel} Wp
+- Fabricante: ${d.fabricantePanel}
+- Modelo / referencia: ${d.modeloPanel}
+- Tecnología: Silicio monocristalino
+El generador estará formado por módulos fotovoltaicos conectados en serie y/o paralelo, cuyas configuraciones de string se justificarán en el anexo de cálculos en función de las tensiones e intensidades admisibles por el inversor.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-3. OBJETO DE LA INSTALACIÓN
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## 4.2. Estructura soporte
+Los módulos se instalarán sobre estructura soporte adecuada al tipo de cubierta (${d.cubierta}), con orientación ${d.orientacion} e inclinación de ${d.incl}°. La estructura y sus anclajes resistirán las sobrecargas de viento y nieve correspondientes a la zona, cuyo cálculo se incluirá en el anexo estructural.
 
-El objeto de la presente memoria es describir y justificar técnicamente la instalación fotovoltaica de autoconsumo a ejecutar en el emplazamiento indicado, con una potencia pico instalada de ${d.kw} kWp, en la modalidad de ${d.conexion.toLowerCase()}.
+## 4.3. Inversor
+- Fabricante: ${d.fabInversor}
+- Potencia nominal AC: ${d.kwInversor} kW
+- Tipo: Inversor de conexión a red
+- Grado de protección: IP65 (exterior)
+El inversor incorporará las protecciones de interconexión exigidas (anti-isla, sobre/subtensión, sobre/subfrecuencia) conforme al Real Decreto 1699/2011.
 
-La instalación se ajusta a lo establecido en el Real Decreto 244/2019, de 5 de abril, por el que se regulan las condiciones administrativas, técnicas y económicas del autoconsumo de energía eléctrica, así como a la normativa específica de ${d.ccaa}.
+${bloqueBateria}## 4.5. Cableado y canalizaciones
+Todos los conductores serán de cobre, con aislamiento adecuado para intemperie en el tramo de corriente continua. Las secciones se dimensionarán de forma que la caída de tensión se mantenga dentro de los límites reglamentarios del REBT, justificándose en el anexo de cálculos eléctricos. Las canalizaciones se ejecutarán bajo tubo o bandeja según su ubicación.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-4. DESCRIPCIÓN DE LA INSTALACIÓN
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## 4.6. Protecciones
+La instalación dispondrá de protecciones en los lados de corriente continua y alterna (seccionamiento, protección frente a sobreintensidades y sobretensiones), así como de la protección de interconexión y anti-isla integrada en el inversor conforme al RD 1699/2011. Los valores y calibres de las protecciones se justificarán en el anexo de cálculos.
 
-4.1 GENERADOR FOTOVOLTAICO
+## 4.7. Puesta a tierra
+La instalación se conectará a la red de puesta a tierra del inmueble, garantizando que las masas metálicas (estructura, marcos de módulos y envolventes) queden equipotencializadas, conforme al REBT. El diseño de la puesta a tierra se justificará en el anexo correspondiente.
 
-  Potencia pico total    : ${d.kw} kWp
-  Número de módulos      : ${d.paneles} unidades
-  Potencia por módulo    : ${d.wpPanel} Wp
-  Fabricante             : ${d.fabricantePanel}
-  Modelo / referencia    : ${d.modeloPanel}
-  Tecnología             : Silicio monocristalino
-  Tipo de cubierta       : ${d.cubierta}
-  Orientación principal  : ${d.orientacion}
-  Inclinación            : ${d.incl}°
-  Condiciones de sombra  : ${d.sombras}
+## 4.8. Equipo de medida
+Se dispondrá de equipo de medida bidireccional, que será solicitado a la empresa distribuidora de la zona, para el registro de la energía consumida y, en su caso, de los excedentes vertidos a la red.
 
-4.2 INVERSOR / CONVERTIDOR DC-AC
+# 5. MODALIDAD DE CONEXIÓN Y AUTOCONSUMO
+La instalación se acoge a la modalidad de ${conexionLow}, conforme al RD 244/2019.
+- Modalidad: ${d.conexion}
+- Punto de conexión: Cuadro general de la instalación interior
 
-  Fabricante             : ${d.fabInversor}
-  Potencia nominal AC    : ${d.kwInversor} kW
-  Tipo                   : Inversor de red monofásico / trifásico
-  Protecciones           : Anti-isla, sobretensión, subtensión,
-                           sobretemperatura, cortocircuito
-  Grado de protección    : IP65 (exterior)
+# 6. ESTIMACIÓN DE PRODUCCIÓN ENERGÉTICA
+- Fuente de datos: ${d.fuenteProduccion}
+- Producción anual estimada: ${d.produccion} kWh/año
+- Factor de rendimiento (PR): 78% (estimado)
+- Orientación / inclinación: ${d.orientacion} / ${d.incl}°
+La estimación de producción se ha obtenido a partir de la ubicación, orientación e inclinación indicadas. Los valores definitivos se confirmarán en el estudio de producción del proyecto.
 
-${d.bateria ? `4.3 SISTEMA DE ALMACENAMIENTO
+# 7. ESTUDIO ECONÓMICO
+- Ahorro económico estimado: ${ahorro.toLocaleString('es-ES')} €/año
+- Período de retorno estimado: ${roi} años
+Estimación orientativa calculada con un precio medio de energía de 0,12 €/kWh y una cobertura estimada del 85% del consumo. Las cifras definitivas dependerán del perfil de consumo real del titular.
 
-  Incluye batería        : Sí
-  Capacidad              : ${d.kwhBateria} kWh
-  Fabricante             : ${d.fabBateria || 'Por determinar'}
-  Tecnología             : Litio-ion LFP
-  Aplicación             : Almacenamiento de excedentes diurnos
-                           para consumo nocturno
+# 8. NORMATIVA Y REGLAMENTACIÓN APLICABLE
+* Real Decreto 244/2019 — Condiciones del autoconsumo de energía eléctrica
+* Reglamento Electrotécnico de Baja Tensión (RD 842/2002), en especial ITC-BT-40
+* Real Decreto 1699/2011 — Conexión a red de instalaciones de pequeña potencia
+* Norma UNE-EN 62446 — Documentación de sistemas fotovoltaicos
+* Normativa autonómica aplicable de ${d.ccaa} (a verificar por el técnico)
 
-` : ''}4.${d.bateria ? '4' : '3'} MODALIDAD DE CONEXIÓN
+# 9. DOCUMENTOS ANEXOS AL PROYECTO
+* Esquema unifilar de la instalación
+* Anexo de cálculos eléctricos (secciones, caídas de tensión, protecciones, puesta a tierra)
+* Fichas técnicas de módulos e inversor
+* Estudio de producción energética
+* Planos de situación y emplazamiento
 
-  Tipo                   : ${d.conexion}
-  Punto de conexión      : Cuadro general de la instalación interior
-  Tarifa de acceso       : A determinar según potencia contratada
+# 10. CONCLUSIÓN
+Con lo expuesto en la presente memoria se considera suficientemente descrita la instalación, quedando pendiente de completar con los cálculos justificativos, el esquema unifilar y la documentación gráfica antes de su presentación ante el organismo competente.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-5. ESTIMACIÓN DE PRODUCCIÓN Y AHORRO
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 11. DECLARACIÓN DEL TÉCNICO RESPONSABLE
+El técnico que suscribe, ${d.tecnico}, en representación de ${d.empresa} (RECI: ${d.reci}), declara que la instalación se ha diseñado conforme a la normativa técnica y de seguridad vigente, y que los datos aportados se corresponden con la información facilitada para la redacción de este documento.${d.notas ? `
 
-Fuente de datos       : ${d.fuenteProduccion}
-Coordenadas evaluadas : ${d.coordenadas}
-Ubicación             : ${d.municipio}, ${d.ccaa}
-
-  Producción anual estimada  : ${d.produccion} kWh/año
-  Factor de rendimiento (PR) : 78%
-  Orientación aplicada       : ${d.orientacion} / ${d.incl}° de inclinación
-  Ahorro económico estimado  : ${ahorro.toLocaleString('es-ES')} €/año *
-  Período de retorno estimado: ${roi} años
-
-  * Calculado con precio medio de energía de 0,12 €/kWh y
-    cobertura estimada del 85% del consumo.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-6. NORMATIVA Y REGLAMENTACIÓN APLICABLE
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  · Real Decreto 244/2019 — Autoconsumo eléctrico
-  · Reglamento Electrotécnico de Baja Tensión (RD 842/2002)
-    — ITC-BT-40: Instalaciones generadoras de baja tensión
-  · Real Decreto 1699/2011 — Conexión a red de energías
-    renovables de pequeña potencia
-  · Norma UNE-EN 62446 — Documentación de sistemas FV
-  · Normativa específica de ${d.ccaa}
-  · Ordenanza municipal de ${d.municipio} (si aplicable)
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-7. DECLARACIÓN DEL TÉCNICO RESPONSABLE
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-El técnico que suscribe, ${d.tecnico}, en nombre de ${d.empresa}
-(RECI: ${d.reci}), certifica que la instalación descrita en la
-presente memoria cumple con la normativa técnica y de seguridad
-vigente, y que los datos aportados son correctos y verídicos.
-
-${d.notas ? `8. OBSERVACIONES ADICIONALES\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n${d.notas}\n\n` : ''}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-En ${d.municipio}, a ${d.fecha}
-
-Fdo: ${d.tecnico}
-${d.empresa}
-RECI: ${d.reci}
-
-[FIRMA Y SELLO DE LA EMPRESA]
-
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-DOCUMENTO GENERADO CON DOCSOLAR v0.1 BETA
-Este documento requiere revisión y firma por parte del
-técnico responsable antes de su presentación oficial.
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+Observaciones adicionales: ${d.notas}` : ''}`;
 }
 
 function descargarTxt(){
@@ -2254,7 +2229,7 @@ function descargarPDF(){
     const doc = new jsPDF({ unit: 'mm', format: 'a4' });
     const d = ultimosDatosGenerados;
 
-    construirPDF(doc, d);
+    construirPDF(doc, d, ultimaMemoriaTexto || generarMemoria(d));
 
     const nombreArchivo = 'memoria_descriptiva_' + (d.titular || 'proyecto')
       .toLowerCase()
@@ -2275,103 +2250,91 @@ function descargarPDF(){
  * se añade contenido, y salta de página automáticamente cuando se acaba
  * el espacio disponible.
  */
-function construirPDF(doc, d){
+function construirPDF(doc, d, textoMemoria){
   const PAGINA_ANCHO = 210;
   const PAGINA_ALTO = 297;
-  const MARGEN = 20;
+  const MARGEN = 18;
   const ANCHO_UTIL = PAGINA_ANCHO - MARGEN * 2;
-  const ALTO_MAX = PAGINA_ALTO - 25; // deja espacio para el pie de página
+  const ALTO_MAX = 272; // deja espacio para el pie de página
 
   let y = MARGEN;
-  let pagina = 1;
+  const indice = []; // {titulo, pagina}
 
-  // ---------- PORTADA ----------
+  // ───────────── PORTADA (página 1) ─────────────
   doc.setFillColor(...PDF_VERDE_OSCURO);
-  doc.rect(0, 0, PAGINA_ANCHO, 80, 'F');
-
+  doc.rect(0, 0, PAGINA_ANCHO, 78, 'F');
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
-  doc.text('DOCSOLAR', MARGEN, 25);
-
-  doc.setFontSize(22);
-  doc.text('Memoria Descriptiva', MARGEN, 45);
-  doc.setFontSize(13);
+  doc.text('DOCSOLAR', MARGEN, 24);
+  doc.setFontSize(24);
+  doc.text('Memoria Descriptiva', MARGEN, 46);
   doc.setFont('helvetica', 'normal');
-  doc.text('Instalación fotovoltaica de autoconsumo', MARGEN, 55);
+  doc.setFontSize(13);
+  doc.text('Instalación solar fotovoltaica de autoconsumo', MARGEN, 56);
+  doc.setFontSize(9.5);
+  doc.text('Borrador técnico generado automáticamente — pendiente de revisión y firma', MARGEN, 68);
 
-  doc.setFontSize(10);
-  doc.text('Borrador generado automáticamente — pendiente de revisión técnica', MARGEN, 68);
-
-  // Bloque de datos clave en portada
-  let yPortada = 100;
-  doc.setTextColor(...PDF_TEXTO);
-
+  let yp = 100;
   const datosPortada = [
     ['Titular', d.titular],
-    ['Dirección', d.direccion],
+    ['Emplazamiento', d.direccion],
     ['Municipio', d.municipio + ', ' + d.ccaa],
     ['Empresa instaladora', d.empresa],
     ['Técnico responsable', d.tecnico],
     ['Potencia instalada', d.kw + ' kWp'],
-    ['Fecha de redacción', d.fecha],
+    ['Modalidad', d.conexion],
+    ['Fecha de redacción', d.fecha]
   ];
-
   doc.setFontSize(11);
-  datosPortada.forEach(([label, valor])=>{
+  datosPortada.forEach(([label, valor]) => {
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...PDF_VERDE_MEDIO);
-    doc.text(label + ':', MARGEN, yPortada);
+    doc.text(label + ':', MARGEN, yp);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...PDF_TEXTO);
-    doc.text(String(valor || '–'), MARGEN + 55, yPortada);
-    yPortada += 9;
+    const v = doc.splitTextToSize(String(valor || '–'), ANCHO_UTIL - 58);
+    doc.text(v[0] || '–', MARGEN + 58, yp);
+    yp += 9.5;
   });
-
-  // Línea separadora
   doc.setDrawColor(...PDF_VERDE_CLARO);
   doc.setLineWidth(0.8);
-  doc.line(MARGEN, yPortada + 5, PAGINA_ANCHO - MARGEN, yPortada + 5);
-
+  doc.line(MARGEN, yp + 4, PAGINA_ANCHO - MARGEN, yp + 4);
   doc.setFontSize(9);
   doc.setTextColor(...PDF_TEXTO_SUAVE);
-  doc.text('Este documento ha sido generado mediante asistencia de inteligencia artificial', MARGEN, yPortada + 15);
-  doc.text('y requiere revisión técnica completa antes de su presentación oficial.', MARGEN, yPortada + 21);
+  doc.text('Documento elaborado con asistencia de inteligencia artificial. Requiere cálculos', MARGEN, yp + 13);
+  doc.text('justificativos, esquema unifilar y firma de técnico competente antes de su tramitación.', MARGEN, yp + 19);
 
-  pintarPiePagina(doc, pagina);
-
-  // ---------- NUEVA PÁGINA: contenido ----------
+  // ───────────── PÁGINA 2 reservada para el ÍNDICE ─────────────
   doc.addPage();
-  pagina++;
+
+  // ───────────── CONTENIDO (página 3 en adelante) ─────────────
+  doc.addPage();
   y = MARGEN;
 
-  function saltoPaginaSiNecesario(espacioNecesario){
-    if(y + espacioNecesario > ALTO_MAX){
-      pintarPiePagina(doc, pagina);
-      doc.addPage();
-      pagina++;
-      y = MARGEN;
-    }
+  function check(h){
+    if(y + h > ALTO_MAX){ doc.addPage(); y = MARGEN; }
   }
 
-  function tituloSeccion(numero, texto){
-    saltoPaginaSiNecesario(18);
+  function cabecera(texto){
+    check(14);
+    indice.push({ titulo: texto, pagina: doc.internal.getNumberOfPages() });
     doc.setFillColor(...PDF_VERDE_OSCURO);
-    doc.rect(MARGEN, y, ANCHO_UTIL, 9, 'F');
+    doc.rect(MARGEN, y, ANCHO_UTIL, 8, 'F');
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.text(numero + '. ' + texto, MARGEN + 3, y + 6.3);
-    y += 14;
+    doc.setFontSize(10.5);
+    doc.text(texto, MARGEN + 3, y + 5.6);
+    y += 8 + 4;
   }
 
-  function subtitulo(texto){
-    saltoPaginaSiNecesario(10);
+  function subt(texto){
+    check(10);
     doc.setTextColor(...PDF_VERDE_MEDIO);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
-    doc.text(texto, MARGEN, y);
-    y += 7;
+    doc.text(texto, MARGEN, y + 4.5);
+    y += 9;
   }
 
   function parrafo(texto){
@@ -2379,211 +2342,99 @@ function construirPDF(doc, d){
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9.5);
     const lineas = doc.splitTextToSize(texto, ANCHO_UTIL);
-    lineas.forEach(linea=>{
-      saltoPaginaSiNecesario(6);
-      doc.text(linea, MARGEN, y);
-      y += 5;
+    lineas.forEach(l => {
+      check(5);
+      doc.text(l, MARGEN, y + 3.6);
+      y += 4.8;
     });
-    y += 3;
+    y += 2.6;
   }
 
-  /**
-   * Tabla simple de 2 columnas (etiqueta / valor), usada para datos
-   * técnicos estructurados. Cada par ocupa una fila.
-   */
+  function vineta(texto){
+    doc.setTextColor(...PDF_TEXTO);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9.5);
+    const lineas = doc.splitTextToSize(texto, ANCHO_UTIL - 6);
+    lineas.forEach((l, k) => {
+      check(5);
+      if(k === 0){
+        doc.setTextColor(...PDF_VERDE_MEDIO);
+        doc.text('•', MARGEN + 1, y + 3.6);
+        doc.setTextColor(...PDF_TEXTO);
+      }
+      doc.text(l, MARGEN + 6, y + 3.6);
+      y += 4.8;
+    });
+    y += 1.2;
+  }
+
   function tablaDatos(filas){
-    const colEtiqueta = 65;
-    const altoFila = 7;
-    filas.forEach(([label, valor], i)=>{
-      saltoPaginaSiNecesario(altoFila);
-      const fondo = i % 2 === 0 ? [255,255,255] : PDF_FONDO_SUAVE;
-      doc.setFillColor(...fondo);
-      doc.rect(MARGEN, y - 5, ANCHO_UTIL, altoFila, 'F');
+    const colEtiq = 56;
+    doc.setFontSize(8.8);
+    filas.forEach(([label, valor], i) => {
+      const labelLineas = doc.splitTextToSize(String(label), colEtiq - 5);
+      const valorLineas = doc.splitTextToSize(String(valor == null ? '–' : valor), ANCHO_UTIL - colEtiq - 5);
+      const nLin = Math.max(labelLineas.length, valorLineas.length, 1);
+      const altoFila = nLin * 4.4 + 2.2;
+      check(altoFila);
+      doc.setFillColor(...(i % 2 === 0 ? [255, 255, 255] : PDF_FONDO_SUAVE));
+      doc.rect(MARGEN, y, ANCHO_UTIL, altoFila, 'F');
       doc.setDrawColor(...PDF_BORDE);
       doc.setLineWidth(0.2);
-      doc.rect(MARGEN, y - 5, ANCHO_UTIL, altoFila, 'S');
-
+      doc.rect(MARGEN, y, ANCHO_UTIL, altoFila, 'S');
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9);
       doc.setTextColor(...PDF_VERDE_OSCURO);
-      doc.text(String(label), MARGEN + 3, y);
-
+      labelLineas.forEach((l, k) => doc.text(l, MARGEN + 3, y + 4 + k * 4.4));
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(...PDF_TEXTO);
-      const valorTexto = doc.splitTextToSize(String(valor ?? '–'), ANCHO_UTIL - colEtiqueta - 6);
-      doc.text(valorTexto[0] || '–', MARGEN + colEtiqueta, y);
-
+      valorLineas.forEach((l, k) => doc.text(l, MARGEN + colEtiq, y + 4 + k * 4.4));
       y += altoFila;
     });
-    y += 5;
+    y += 4;
   }
 
-  function avisoDestacado(texto, tipo){
-    // tipo: 'info' (verde) | 'warn' (amarillo)
-    const colorFondo = tipo === 'warn' ? [255, 251, 235] : PDF_FONDO_SUAVE;
-    const colorBorde = tipo === 'warn' ? [246, 173, 85] : PDF_VERDE_CLARO;
-    const colorTexto = tipo === 'warn' ? [116, 66, 16] : PDF_VERDE_OSCURO;
-
+  function avisoWarn(texto){
     doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
     const lineas = doc.splitTextToSize(texto, ANCHO_UTIL - 8);
     const altoBox = lineas.length * 4.6 + 6;
-    saltoPaginaSiNecesario(altoBox);
-
-    doc.setFillColor(...colorFondo);
-    doc.setDrawColor(...colorBorde);
+    check(altoBox);
+    doc.setFillColor(255, 251, 235);
+    doc.setDrawColor(246, 173, 85);
     doc.setLineWidth(0.4);
-    doc.rect(MARGEN, y - 4, ANCHO_UTIL, altoBox, 'FD');
-
-    doc.setTextColor(...colorTexto);
-    doc.setFont('helvetica', 'normal');
-    let yy = y + 1;
-    lineas.forEach(linea=>{
-      doc.text(linea, MARGEN + 4, yy);
-      yy += 4.6;
-    });
+    doc.rect(MARGEN, y, ANCHO_UTIL, altoBox, 'FD');
+    doc.setTextColor(116, 66, 16);
+    let yy = y + 5;
+    lineas.forEach(l => { doc.text(l, MARGEN + 4, yy); yy += 4.6; });
     y += altoBox + 5;
   }
 
-  // ---------- 1. DATOS DEL DOCUMENTO ----------
-  tituloSeccion(1, 'DATOS DEL DOCUMENTO');
-  tablaDatos([
-    ['Fecha de redacción', d.fecha],
-    ['Revisión', '1.0'],
-    ['Tipo de documento', 'Memoria descriptiva técnica'],
-    ['Normativa aplicada', 'RD 244/2019 · REBT ITC-BT-40'],
-    ['Normativa autonómica', d.ccaa],
-  ]);
+  // ───────────── PARSEO DEL MARKUP ─────────────
+  const lineas = (textoMemoria || '').replace(/\r/g, '').split('\n');
+  let bufDatos = [];
+  function flush(){ if(bufDatos.length){ tablaDatos(bufDatos); bufDatos = []; } }
 
-  // ---------- 2. EMPRESA INSTALADORA ----------
-  tituloSeccion(2, 'DATOS DE LA EMPRESA INSTALADORA');
-  tablaDatos([
-    ['Razón social', d.empresa],
-    ['CIF / NIF', d.cif],
-    ['Técnico responsable', d.tecnico],
-    ['RECI', d.reci],
-    ['Teléfono', d.telefono],
-    ['Email', d.email],
-  ]);
+  lineas.forEach(raw => {
+    const s = raw.replace(/\*\*/g, '');
+    const t = s.trim();
+    if(t === ''){ flush(); y += 1.5; return; }
+    if(t.startsWith('# ')){ flush(); cabecera(t.slice(2).trim()); return; }
+    if(t.startsWith('## ')){ flush(); subt(t.slice(3).trim()); return; }
+    const mData = t.match(/^[-•]\s*(.+?):\s*(.*)$/);
+    if(mData){ bufDatos.push([mData[1].trim(), mData[2].trim()]); return; }
+    if(t.startsWith('* ') || t.startsWith('- ') || t.startsWith('• ')){
+      flush(); vineta(t.replace(/^[-*•]\s*/, '')); return;
+    }
+    flush(); parrafo(t);
+  });
+  flush();
 
-  // ---------- 3. TITULAR Y EMPLAZAMIENTO ----------
-  tituloSeccion(3, 'DATOS DEL TITULAR Y EMPLAZAMIENTO');
-  tablaDatos([
-    ['Titular', d.titular],
-    ['Dirección', d.direccion],
-    ['Municipio', d.municipio],
-    ['Comunidad Autónoma', d.ccaa],
-    ['Referencia catastral', d.catastro],
-    ['Tipo de inmueble', d.inmueble],
-  ]);
+  // ───────────── AVISO FINAL + FIRMA ─────────────
+  y += 3;
+  avisoWarn('DOCUMENTO BORRADOR GENERADO AUTOMÁTICAMENTE. Requiere cálculos justificativos (secciones, caídas de tensión, protecciones, puesta a tierra), esquema unifilar y revisión y firma de un técnico competente antes de su presentación ante cualquier organismo oficial.');
 
-  // ---------- 4. OBJETO DE LA INSTALACIÓN ----------
-  tituloSeccion(4, 'OBJETO DE LA INSTALACIÓN');
-  parrafo(
-    'El objeto de la presente memoria es describir y justificar técnicamente la instalación ' +
-    'fotovoltaica de autoconsumo a ejecutar en el emplazamiento indicado, con una potencia pico ' +
-    'instalada de ' + d.kw + ' kWp, en la modalidad de ' + d.conexion.toLowerCase() + '.'
-  );
-  parrafo(
-    'La instalación se ajusta a lo establecido en el Real Decreto 244/2019, de 5 de abril, por el ' +
-    'que se regulan las condiciones administrativas, técnicas y económicas del autoconsumo de ' +
-    'energía eléctrica, así como a la normativa específica de ' + d.ccaa + '.'
-  );
-
-  // ---------- 5. DESCRIPCIÓN DE LA INSTALACIÓN ----------
-  tituloSeccion(5, 'DESCRIPCIÓN DE LA INSTALACIÓN');
-
-  subtitulo('5.1 Generador fotovoltaico');
-  tablaDatos([
-    ['Potencia pico total', d.kw + ' kWp'],
-    ['Número de módulos', d.paneles + ' unidades'],
-    ['Potencia por módulo', d.wpPanel + ' Wp'],
-    ['Fabricante', d.fabricantePanel],
-    ['Modelo / referencia', d.modeloPanel],
-    ['Tipo de cubierta', d.cubierta],
-    ['Orientación principal', d.orientacion],
-    ['Inclinación', d.incl + '°'],
-    ['Condiciones de sombra', d.sombras],
-  ]);
-
-  subtitulo('5.2 Inversor / convertidor DC-AC');
-  tablaDatos([
-    ['Fabricante', d.fabInversor],
-    ['Potencia nominal AC', d.kwInversor + ' kW'],
-    ['Tipo', 'Inversor de red mono/trifásico'],
-    ['Protecciones', 'Anti-isla, sobretensión, subtensión, sobretemperatura, cortocircuito'],
-    ['Grado de protección', 'IP65 (exterior)'],
-  ]);
-
-  if(d.bateria){
-    subtitulo('5.3 Sistema de almacenamiento');
-    tablaDatos([
-      ['Incluye batería', 'Sí'],
-      ['Capacidad', d.kwhBateria + ' kWh'],
-      ['Fabricante', d.fabBateria || 'Por determinar'],
-      ['Tecnología', 'Litio-ion LFP'],
-    ]);
-  }
-
-  subtitulo((d.bateria ? '5.4' : '5.3') + ' Modalidad de conexión');
-  tablaDatos([
-    ['Tipo', d.conexion],
-    ['Punto de conexión', 'Cuadro general de la instalación interior'],
-    ['Tarifa de acceso', 'A determinar según potencia contratada'],
-  ]);
-
-  // ---------- 6. PRODUCCIÓN Y AHORRO ----------
-  const ahorro = Math.round(d.kw * 0.12 * 1300 * 0.85);
-  const roi = Math.round((d.kw * 1100) / ahorro * 10) / 10;
-
-  tituloSeccion(6, 'ESTIMACIÓN DE PRODUCCIÓN Y AHORRO');
-  tablaDatos([
-    ['Fuente de datos', d.fuenteProduccion],
-    ['Coordenadas evaluadas', d.coordenadas],
-    ['Producción anual estimada', d.produccion + ' kWh/año'],
-    ['Factor de rendimiento (PR)', '78%'],
-    ['Orientación / inclinación', d.orientacion + ' / ' + d.incl + '°'],
-    ['Ahorro económico estimado', ahorro.toLocaleString('es-ES') + ' €/año *'],
-    ['Período de retorno estimado', roi + ' años'],
-  ]);
-  parrafo('* Calculado con precio medio de energía de 0,12 €/kWh y cobertura estimada del 85% del consumo.');
-
-  // ---------- 7. NORMATIVA APLICABLE ----------
-  tituloSeccion(7, 'NORMATIVA Y REGLAMENTACIÓN APLICABLE');
-  parrafo('· Real Decreto 244/2019 — Autoconsumo eléctrico');
-  parrafo('· Reglamento Electrotécnico de Baja Tensión (RD 842/2002) — ITC-BT-40: Instalaciones generadoras de baja tensión');
-  parrafo('· Real Decreto 1699/2011 — Conexión a red de energías renovables de pequeña potencia');
-  parrafo('· Norma UNE-EN 62446 — Documentación de sistemas FV');
-  parrafo('· Normativa específica de ' + d.ccaa);
-  parrafo('· Ordenanza municipal de ' + d.municipio + ' (si aplicable)');
-
-  // ---------- 8. DECLARACIÓN DEL TÉCNICO ----------
-  tituloSeccion(8, 'DECLARACIÓN DEL TÉCNICO RESPONSABLE');
-  parrafo(
-    'El técnico que suscribe, ' + d.tecnico + ', en nombre de ' + d.empresa + ' (RECI: ' + d.reci + '), ' +
-    'certifica que la instalación descrita en la presente memoria cumple con la normativa técnica y ' +
-    'de seguridad vigente, y que los datos aportados son correctos y verídicos.'
-  );
-
-  // ---------- 9. OBSERVACIONES (si las hay) ----------
-  if(d.notas && d.notas.trim()){
-    tituloSeccion(9, 'OBSERVACIONES ADICIONALES');
-    parrafo(d.notas);
-  }
-
-  // ---------- AVISO FINAL ----------
-  saltoPaginaSiNecesario(40);
-  y += 5;
-  avisoDestacado(
-    'DOCUMENTO GENERADO AUTOMÁTICAMENTE — BORRADOR PENDIENTE DE REVISIÓN. ' +
-    'Este documento ha sido generado mediante asistencia de inteligencia artificial y requiere ' +
-    'revisión técnica completa, verificación normativa actualizada y firma por parte de un técnico ' +
-    'competente antes de su presentación ante cualquier organismo oficial.',
-    'warn'
-  );
-
-  // ---------- FIRMA ----------
-  saltoPaginaSiNecesario(35);
-  y += 8;
+  check(36);
+  y += 6;
   doc.setTextColor(...PDF_TEXTO);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9.5);
@@ -2591,42 +2442,51 @@ function construirPDF(doc, d){
   y += 16;
   doc.setDrawColor(...PDF_TEXTO_SUAVE);
   doc.setLineWidth(0.2);
-  doc.line(MARGEN, y, MARGEN + 70, y);
+  doc.line(MARGEN, y, MARGEN + 72, y);
   y += 5;
   doc.setFont('helvetica', 'bold');
   doc.text('Fdo: ' + d.tecnico, MARGEN, y);
   y += 5;
   doc.setFont('helvetica', 'normal');
-  doc.text(d.empresa, MARGEN, y);
-  y += 5;
-  doc.text('RECI: ' + d.reci, MARGEN, y);
+  doc.text(d.empresa + '  ·  RECI: ' + d.reci, MARGEN, y);
 
-  pintarPiePagina(doc, pagina);
+  // ───────────── ÍNDICE en la página 2 reservada ─────────────
+  doc.setPage(2);
+  let yi = MARGEN;
+  doc.setFillColor(...PDF_VERDE_OSCURO);
+  doc.rect(MARGEN, yi, ANCHO_UTIL, 8, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10.5);
+  doc.text('ÍNDICE', MARGEN + 3, yi + 5.6);
+  yi += 16;
+  doc.setFontSize(9.5);
+  indice.forEach(item => {
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...PDF_TEXTO);
+    const titulo = doc.splitTextToSize(item.titulo, ANCHO_UTIL - 18)[0];
+    doc.text(titulo, MARGEN, yi);
+    doc.setTextColor(...PDF_TEXTO_SUAVE);
+    doc.text(String(item.pagina), PAGINA_ANCHO - MARGEN, yi, { align: 'right' });
+    doc.setDrawColor(...PDF_BORDE);
+    doc.setLineWidth(0.15);
+    doc.line(MARGEN, yi + 2.5, PAGINA_ANCHO - MARGEN, yi + 2.5);
+    yi += 8;
+  });
 
-  // ---------- NUMERACIÓN DE PÁGINAS (segunda pasada) ----------
-  const totalPaginas = doc.internal.getNumberOfPages();
-  for(let p = 1; p <= totalPaginas; p++){
+  // ───────────── PIE Y NUMERACIÓN (todas menos la portada) ─────────────
+  const total = doc.internal.getNumberOfPages();
+  for(let p = 2; p <= total; p++){
     doc.setPage(p);
+    doc.setDrawColor(...PDF_BORDE);
+    doc.setLineWidth(0.2);
+    doc.line(MARGEN, PAGINA_ALTO - 14, PAGINA_ANCHO - MARGEN, PAGINA_ALTO - 14);
     doc.setFontSize(8);
     doc.setTextColor(...PDF_TEXTO_SUAVE);
     doc.setFont('helvetica', 'normal');
-    doc.text('Página ' + p + ' de ' + totalPaginas, PAGINA_ANCHO - MARGEN, PAGINA_ALTO - 10, { align: 'right' });
+    doc.text('DocSolar · Borrador pendiente de revisión técnica', MARGEN, PAGINA_ALTO - 9);
+    doc.text('Página ' + p + ' de ' + total, PAGINA_ANCHO - MARGEN, PAGINA_ALTO - 9, { align: 'right' });
   }
-}
-
-function pintarPiePagina(doc, pagina){
-  const PAGINA_ANCHO = 210;
-  const PAGINA_ALTO = 297;
-  const MARGEN = 20;
-
-  doc.setDrawColor(...PDF_BORDE);
-  doc.setLineWidth(0.2);
-  doc.line(MARGEN, PAGINA_ALTO - 15, PAGINA_ANCHO - MARGEN, PAGINA_ALTO - 15);
-
-  doc.setFontSize(8);
-  doc.setTextColor(...PDF_TEXTO_SUAVE);
-  doc.setFont('helvetica', 'normal');
-  doc.text('DocSolar · Borrador generado automáticamente, pendiente de revisión técnica', MARGEN, PAGINA_ALTO - 10);
 }
 
 function copiarTexto(){
